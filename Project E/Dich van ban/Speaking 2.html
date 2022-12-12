@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <head>
+        <link rel="shortcut icon" type="image/x-icon" href="logo.png" />
+    </head>      
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <title>Document</title>
+</head>
+<body id = "body">
+    <div class = "ngang" id="ngang">
+        <div id="scripts" >
+            <div id = "topic" class ="vietnamese"></div>
+        </div>
+        <div>
+            <button type="button" id ="edit" class="mm" data-toggle="modal" data-target="#myModal">
+                <span class="glyphicon glyphicon-pencil"></span>
+            </button>
+            <label for="file-upload" class="mm upload">
+                <span class="glyphicon glyphicon-upload"></span>
+            </label>
+            <button id="left" class="mm" onclick="goLeft()"><span class="glyphicon glyphicon-triangle-left"></span></button>
+            <input id="file-upload" onchange="load()" type="file"/>
+            <button id="save" class="mm" onclick="save('')"><span class="glyphicon glyphicon-download"></span></button>
+            <button id="check" class="mm" onclick="check('')"><span class="glyphicon glyphicon-check"></span></button>
+            <button id="eye" class="mm" onclick="showAns()"><span class="glyphicon glyphicon-eye-close"></span></button>
+            <div id = "error">0</div>
+            <div class = "wrong">Errors</div>
+        </div>
+        <div id="answer">
+            <div id="ans" class ="scripts"></div>
+        </div>
+    
+        <!-- Modal -->
+        <div class="modal fade" id="myModal" role="dialog">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Setting</h4>
+            </div>
+            <div class="modal-body">
+                <div class = "ngang">
+                    <div>Eng</div>
+                    <div></div>
+                    <div>Vi</div>
+                </div>
+                <div class = "ngang">
+                    <div id = "end_input" class = "input_div" contenteditable></div>
+                    <div></div>
+                    <div id = "vi_input" class = "input_div" contenteditable></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="build()">Save</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+            </div>
+        </div>
+        </div>
+    </div>
+</body>
+<script src="scripts.js"></script>
+<script src="http://danml.com/js/download.js"></script>
+</html>

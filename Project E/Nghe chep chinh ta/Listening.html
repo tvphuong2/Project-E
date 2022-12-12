@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <head>
+        <link rel="shortcut icon" type="image/x-icon" href="logo.png" />
+    </head>      
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <title>Document</title>
+</head>
+<body id = "body">
+    <div class="container-fluid controler">
+        <div class="col-xs-12 custom-file">
+            <span class="col-xs-1 text-right"> load Audio</span><input type="file" id="upload"  class="col-xs-2"/>
+            <span class="col-xs-1 text-right"> load Save</span><input type="file" id="load_save"  class="col-xs-2"/>
+            <span class="col-xs-1 text-right"> Pause delay</span><input type="number" id="pause"  class="col-xs-2" value="1"/>
+            <span class="col-xs-1 text-right"> Previous delay</span><input type="number" id="previous"  class="col-xs-2" value="2"/>
+        </div>
+        <audio id="audio" controls>
+            <source src="" id="src" />
+        </audio>
+    </div>
+
+    <div class = "ngang" id="ngang">
+        <div id="scripts" >
+            <input type="text" id = "search">
+            <button id="remove_name" onclick="removeName()">remove name</button>
+            <button id="remove_space" onclick="removeSpace()">remove space</button>
+            <button id="split_line" onclick="splitLine()">split line</button>
+            <div id = "topic" class ="scripts" contenteditable></div>
+        </div>
+        <div>
+            <button id ="start" class="mm" onclick="start()">◄</button>
+            <button id ="re_check" class="mm" onclick="check()">?</button>
+            <button id="load" class="mm" onclick="load('')">Load</button>
+            <button id="save" class="mm" onclick="save('')">Save</button>
+        </div>
+        <div id="answer">
+            <span id = "score">0 Fails</span>
+            <div id="ans" class ="scripts" contenteditable></div>
+        </div>
+        
+    </div>
+</body>
+<script src="scripts.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="http://danml.com/js/download.js"></script>
+</html>

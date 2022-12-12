@@ -1,0 +1,66 @@
+.scripts {
+    display: block;
+    min-height: 1000px;
+    background-color: antiquewhite;
+    font-size: 18px;
+    padding: 10px;
+}
+
+.scripts div {
+    margin-bottom: 18px;
+}
+
+.scripts div:hover {
+    background-color: rgb(230, 200, 236);
+}
+
+.controler {
+    position: fixed;
+    width: 100%;
+    background-color: rgb(255, 255, 255);
+    box-shadow: 0rem 0.5rem 5px rgb(175, 175, 175);
+    text-align: center;
+    top: 0;
+    padding-top: 10px;
+    border-radius: 0 0 20px 20px;
+}
+
+.ngang {
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+#audio {
+    width: 100%;
+}
+
+.ml {
+    margin-left: 1%;
+}
+
+.mm {
+    display: block;
+    font-size: 22px;
+    margin: auto;
+    margin-top: 30px;
+    height: 50px;
+    border-radius: 20%;
+    width: 80%;
+}
+
+.mr {
+    margin-right: 1%;
+}
+
+.ngang {
+    padding-top: 150px;
+    display: grid;
+    grid-template-columns: 48% 4% 48%;
+}
+
+#score {
+    color: rgb(231, 82, 82);
+    font-size: 20px;
+}
