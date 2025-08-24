@@ -33,9 +33,10 @@ class ExerciseBuilder:
         return {
             "type": "vi2en_mcq",
             "word": word["word"],
-            "prompt_vi": word.get("meaning_vi","(no meaning)"),
+            "prompt_vi": word.get("meaning_vi", "(no meaning)"),
             "options": options,
-            "answer": word["word"]
+            "answer": word["word"],
+            "pos": word.get("pos", "")
         }
 
     @staticmethod
@@ -43,7 +44,8 @@ class ExerciseBuilder:
         return {
             "type": "type_from_meaning",
             "word": word["word"],
-            "prompt_vi": word.get("meaning_vi","(no meaning)"),
+            "prompt_vi": word.get("meaning_vi", "(no meaning)"),
+            "pos": word.get("pos", ""),
         }
 
     @staticmethod
@@ -54,6 +56,7 @@ class ExerciseBuilder:
             "word": word["word"],
             "prompt_vi": pair.get("vi", ""),
             "answer": pair.get("en", ""),
+            "pos": word.get("pos", ""),
         }
 
     @staticmethod
@@ -64,12 +67,19 @@ class ExerciseBuilder:
             return None
         pairs = []
         for w in words:
-            meaning = next((c.get("meaning_vi", "") for c in all_words if c["word"].lower()==w.lower()), "")
-            if not meaning and llm:
-                meaning = llm.describe_word(w).get("meaning_vi", "")
-            pairs.append({"en": w, "vi": meaning})
+            card = next((c for c in all_words if c["word"].lower() == w.lower()), None)
+            meaning = card.get("meaning_vi", "") if card else ""
+            pos = card.get("pos", "") if card else ""
+            if (not meaning or not pos) and llm:
+                desc = llm.describe_word(w)
+                if not meaning:
+                    meaning = desc.get("meaning_vi", "")
+                if not pos:
+                    pos = desc.get("pos", "")
+            pairs.append({"en": w, "vi": meaning, "pos": pos})
         en_words = [p["en"] for p in pairs]
         vi_meanings = [p["vi"] for p in pairs]
+        pos_map = {p["en"]: p["pos"] for p in pairs}
         random.shuffle(en_words)
         random.shuffle(vi_meanings)
         mapping = {p["en"]: p["vi"] for p in pairs}
@@ -79,6 +89,7 @@ class ExerciseBuilder:
             "en_words": en_words,
             "vi_meanings": vi_meanings,
             "pairs": mapping,
+            "pos_map": pos_map,
         }
 
     @staticmethod

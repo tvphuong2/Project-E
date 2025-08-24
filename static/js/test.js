@@ -52,7 +52,7 @@ function renderItem(it, box){
   const wrap = document.createElement('div');
   wrap.className = 'card';
   if(it.type === 'vi2en_mcq'){
-    wrap.innerHTML = `<div><b>[MCQ]</b> Dịch sang tiếng Anh: <i>${it.prompt_vi}</i></div>`;
+    wrap.innerHTML = `<div><b>[MCQ]</b> ${it.pos ? '('+it.pos+') ' : ''}Dịch sang tiếng Anh: <i>${it.prompt_vi}</i></div>`;
     const opts = document.createElement('div');
     it.options.forEach(opt=>{
       const btn = document.createElement('button');
@@ -67,7 +67,7 @@ function renderItem(it, box){
     });
     wrap.appendChild(opts);
     }else if(it.type === 'type_from_meaning'){
-      wrap.innerHTML = `<div><b>[Gõ từ]</b> Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>`;
+      wrap.innerHTML = `<div><b>[Gõ từ]</b> ${it.pos ? '('+it.pos+') ' : ''}Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>`;
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.id = 'ans';
@@ -83,7 +83,7 @@ function renderItem(it, box){
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
       wrap.appendChild(btn);
     }else if(it.type === 'vi_sentence_input'){
-      wrap.innerHTML = `<div><b>[Dịch câu]</b> ${it.prompt_vi}</div>`;
+      wrap.innerHTML = `<div><b>[Dịch câu]</b> ${it.pos ? '('+it.pos+') ' : ''}${it.prompt_vi}</div>`;
       const inp = document.createElement('textarea');
       inp.id = 'ans';
       wrap.appendChild(inp);
@@ -106,7 +106,7 @@ function renderItem(it, box){
         const row = document.createElement('div');
         row.className = 'flex match-row';
         const sp = document.createElement('div');
-        sp.textContent = en;
+        sp.textContent = en + (it.pos_map && it.pos_map[en] ? ` (${it.pos_map[en]})` : '');
         row.appendChild(sp);
         const sel = document.createElement('select');
         sel.innerHTML = '<option value="">--Chọn--</option>' + it.vi_meanings.map(v=>`<option value="${v}">${v}</option>`).join('');
