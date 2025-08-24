@@ -154,12 +154,12 @@ def vocab_enrich_all():
 
 # ---------- BÀI TEST ----------
 @bp.get("/test")
-def test_page():
+def get_test_page():
     "Trang bắt đầu bài test ôn từ (templates/test.html)."
     return render_template("test.html", title="Test từ vựng")
 
 @bp.post("/tests/start")
-def tests_start():
+def start_tests():
     "Chọn 10 từ theo tỉ lệ 5/30/65, sinh bài tập (MCQ + gõ từ)."
     data = load_cards()
     picked = WordSampler.sample_for_test(data["cards"], k=10)
@@ -174,7 +174,7 @@ def tests_start():
     return jsonify({"session_id": session_id, "picked_words": [x["word"] for x in picked], "items": items})
 
 @bp.post("/tests/finalize")
-def tests_finalize():
+def finalize_tests():
     """Finalize test session: update memory labels & save history."""
     import os, json
     body = request.get_json(force=True)
