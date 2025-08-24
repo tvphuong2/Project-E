@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>{{ lesson.title }}</h3>
+  <audio id="audio" controls src="/{{ lesson.audio_path }}"></audio>
+  <div><b>Thời gian còn lại:</b> <span id="countdown">30:00</span></div>
+</div>
+
+<div class="card">
+  <div><b>Phím tắt:</b> '=' tạm dừng & lùi 3s (nếu đang phát) / phát (nếu đang dừng), '-' lùi 10s</div>
+  <label>Gõ transcript</label>
+  <textarea id="transcript" placeholder="Nhập nội dung bạn nghe được..."></textarea>
+  <div class="flex">
+    <button class="btn" id="btnCheck">Kiểm tra (WER)</button>
+    <button class="btn secondary" id="btnSaveWord">Lưu từ đã bôi đen</button>
+  </div>
+  <div class="small mono">Tham chiếu đã chuẩn hoá: {{ lesson.n_ref_words }} từ</div>
+</div>
+
+<div id="result"></div>
+
+<div class="card" id="answerBox" style="display:none;">
+  <h3>Đáp án</h3>
+  <pre id="answerText" class="small mono"></pre>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/lesson.js') }}"></script>
+{% endblock %}

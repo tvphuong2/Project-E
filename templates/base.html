@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title or "Dictation App" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="/">Trang chủ</a>
+        <a href="/vocab">Ôn từ mới</a>
+        <a href="/test">Làm bài test</a>
+      </nav>
+    </header>
+    {% block content %}{% endblock %}
+  </body>
+</html>

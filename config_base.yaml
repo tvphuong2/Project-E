@@ -1,0 +1,14 @@
+# Rename this file to config.yaml and fill your keys.
+openai:
+  api_key: "..."
+  model: "..."   # or any model you prefer
+
+google_cse:
+  api_key: "..."
+  cx: "..."   # custom search engine id
+
+app:
+  max_attempt_duration_min: 30
+  host: "127.0.0.1"
+  port: 5000
+  debug: true

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+  <!-- Tổng quan & điều khiển -->
+  <div class="card">
+    <h3>Ôn từ mới</h3>
+
+    <div class="grid grid-2" style="margin-bottom:12px">
+      <div>
+        <div>RAW: <span class="badge" id="countRaw">0</span></div>
+        <div>ENRICH: <span class="badge" id="countEnrich">0</span></div>
+        <div>ADDITIONAL: <span class="badge" id="countAdditional">0</span></div>
+      </div>
+      <div>
+        <div>LTM: <span class="badge" id="countLTM">0</span></div>
+        <div>STM: <span class="badge" id="countSTM">0</span></div>
+        <div>REVIEW/None: <span class="badge" id="countREVIEW">0</span></div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:12px">
+      <div>
+        <label for="q">Tìm kiếm</label>
+        <input id="q" placeholder="Nhập từ khoá...">
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <label for="filterStatus">Trạng thái</label>
+          <select id="filterStatus">
+            <option value="">Tất cả</option>
+            <option value="raw">raw</option>
+            <option value="enrich">enrich</option>
+            <option value="additional">additional</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterMemory">Bộ nhớ</label>
+          <select id="filterMemory">
+            <option value="">Tất cả</option>
+            <option value="LTM">LTM</option>
+            <option value="STM">STM</option>
+            <option value="REVIEW">REVIEW/None</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex">
+      <button class="btn" id="btnEnrichAll">Enrich All</button>
+      <button class="btn secondary" id="btnRefresh">Tải lại</button>
+    </div>
+  </div>
+
+  <!-- Danh sách & chi tiết -->
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Danh sách từ</h3>
+      <div id="statsInfo" class="small mono" style="margin-bottom:8px;"></div>
+      <div id="wordList"></div>
+    </div>
+
+    <div class="card" id="detailPanel">
+      <h3>Chi tiết thẻ</h3>
+      <div id="detailBody"><i>Chọn một thẻ ở danh sách để xem chi tiết...</i></div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/vocab.js') }}"></script>
+{% endblock %}
