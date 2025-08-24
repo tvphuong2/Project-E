@@ -6,6 +6,10 @@ let nextRound = [];
 let wrongCounts = {};
 let currentItem = null;
 
+function normalizeSentence(s){
+  return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
+}
+
 window.addEventListener('DOMContentLoaded', ()=>{
   $('#btnStart').addEventListener('click', startTest);
 });
@@ -62,25 +66,69 @@ function renderItem(it, box){
       opts.appendChild(document.createTextNode(' '));
     });
     wrap.appendChild(opts);
-  }else if(it.type === 'type_from_meaning'){
-    wrap.innerHTML = `<div><b>[Gõ từ]</b> Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>`;
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.id = 'ans';
-    wrap.appendChild(inp);
-    const btn = document.createElement('button');
-    btn.className = 'btn secondary';
-    btn.textContent = 'Kiểm tra';
-    btn.addEventListener('click', ()=>{
-      const v = inp.value.trim();
-      const correct = (v.toLowerCase() === it.word.toLowerCase());
-      showFeedback(correct, it.word);
-    });
-    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
-    wrap.appendChild(btn);
-  }else{
-    wrap.textContent = '(Bài tập khác sẽ được bổ sung)';
-  }
+    }else if(it.type === 'type_from_meaning'){
+      wrap.innerHTML = `<div><b>[Gõ từ]</b> Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>`;
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'ans';
+      wrap.appendChild(inp);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      btn.addEventListener('click', ()=>{
+        const v = inp.value.trim();
+        const correct = (v.toLowerCase() === it.word.toLowerCase());
+        showFeedback(correct, it.word);
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
+      wrap.appendChild(btn);
+    }else if(it.type === 'vi_sentence_input'){
+      wrap.innerHTML = `<div><b>[Dịch câu]</b> ${it.prompt_vi}</div>`;
+      const inp = document.createElement('textarea');
+      inp.id = 'ans';
+      wrap.appendChild(inp);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      const check = ()=>{
+        const v = normalizeSentence(inp.value);
+        const ans = normalizeSentence(it.answer);
+        const correct = (v === ans);
+        showFeedback(correct, it.answer);
+      };
+      btn.addEventListener('click', check);
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.ctrlKey) check(); });
+      wrap.appendChild(btn);
+    }else if(it.type === 'en_vi_match'){
+      wrap.innerHTML = `<div><b>[Nối từ]</b> Ghép từ tiếng Anh với nghĩa tiếng Việt</div>`;
+      const selects = {};
+      it.en_words.forEach(en=>{
+        const row = document.createElement('div');
+        row.className = 'flex match-row';
+        const sp = document.createElement('div');
+        sp.textContent = en;
+        row.appendChild(sp);
+        const sel = document.createElement('select');
+        sel.innerHTML = '<option value="">--Chọn--</option>' + it.vi_meanings.map(v=>`<option value="${v}">${v}</option>`).join('');
+        row.appendChild(sel);
+        wrap.appendChild(row);
+        selects[en] = sel;
+      });
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      btn.addEventListener('click', ()=>{
+        let ok = true;
+        for(const en of Object.keys(selects)){
+          if(selects[en].value !== it.pairs[en]){ ok = false; break; }
+        }
+        const ans = Object.entries(it.pairs).map(([e,v])=>`${e}=${v}`).join(', ');
+        showFeedback(ok, ans);
+      });
+      wrap.appendChild(btn);
+    }else{
+      wrap.textContent = '(Bài tập khác sẽ được bổ sung)';
+    }
   const fb = document.createElement('div');
   fb.id = 'fb';
   fb.className = 'small mono';
@@ -104,7 +152,7 @@ async function finalize(){
     results[w] = wrongCounts[w] || 0;
   });
   const res = await postJSON('/tests/finalize', { session_id: session.session_id, results });
-  alert('Hoàn tất. Nhãn: ' + JSON.stringify(res.label_summary));
+  alert('Hoàn tất. Nhãn: ' + JSON.stringify(res.label_summary) + `\nThời gian: ${res.duration_sec}s\nLặp lại: ${res.retakes}`);
   document.body.classList.remove('testing');
   $('#startCard').classList.remove('hidden');
   const quiz = $('#quiz');

@@ -160,23 +160,30 @@ def get_test_page():
 
 @bp.post("/tests/start")
 def start_tests():
-    "Chọn 10 từ theo tỉ lệ 5/30/65, sinh bài tập (MCQ + gõ từ)."
+    "Chọn 10 từ theo tỉ lệ 5/30/65, sinh bài tập." 
     data = load_cards()
     picked = WordSampler.sample_for_test(data["cards"], k=10)
-    items = ExerciseBuilder.build_for_words(picked, data["cards"])
+    llm: LLMClient = current_app.config.get("LLM_CLIENT")
+    items = ExerciseBuilder.build_for_words(picked, data["cards"], llm)
 
     session_id = str(uuid.uuid4())
     sess_path = __import__("os").path.join(current_app.config["TESTS_DIR"], f"{session_id}.json")
     with open(sess_path, "w", encoding="utf-8") as f:
         import json
-        json.dump({"session_id": session_id, "picked_words": [x["word"] for x in picked], "items": items, "answers": []}, f, ensure_ascii=False, indent=2)
+        json.dump({
+            "session_id": session_id,
+            "picked_words": [x["word"] for x in picked],
+            "items": items,
+            "started_at": _iso(_utcnow()),
+            "answers": []
+        }, f, ensure_ascii=False, indent=2)
 
     return jsonify({"session_id": session_id, "picked_words": [x["word"] for x in picked], "items": items})
 
 @bp.post("/tests/finalize")
 def finalize_tests():
     """Finalize test session: update memory labels & save history."""
-    import os, json
+    import os, json, datetime as dt
     body = request.get_json(force=True)
     sid = body.get("session_id")
     results = body.get("results") or {}
@@ -208,6 +215,15 @@ def finalize_tests():
                 c["stats"] = stats
     save_cards(data)
 
+    # compute stats
+    total_retakes = sum(int(results.get(w,0)) for w in sess.get("picked_words", []))
+    start = sess.get("started_at")
+    try:
+        start_dt = dt.datetime.fromisoformat(start.replace('Z','')) if start else None
+        duration_sec = int((_utcnow() - start_dt).total_seconds()) if start_dt else None
+    except Exception:
+        duration_sec = None
+
     # append to user stats history
     usp = current_app.config["USER_STATS_PATH"]
     if os.path.isfile(usp):
@@ -217,10 +233,13 @@ def finalize_tests():
         ustats = {"lessons": {}, "tests": []}
     ustats.setdefault("tests", []).append({
         "session_id": sid,
+        "started_at": start,
         "finished_at": _iso(_utcnow()),
+        "duration_sec": duration_sec,
+        "retakes": total_retakes,
         "results": {w: {"wrong": int(results.get(w,0)), "label": "LTM" if int(results.get(w,0)) == 0 else ("STM" if int(results.get(w,0)) == 1 else "REVIEW")} for w in sess.get("picked_words", [])}
     })
     with open(usp, "w", encoding="utf-8") as f:
         json.dump(ustats, f, ensure_ascii=False, indent=2)
 
-    return jsonify({"message": "Đã lưu kết quả", "label_summary": label_summary})
+    return jsonify({"message": "Đã lưu kết quả", "label_summary": label_summary, "duration_sec": duration_sec, "retakes": total_retakes})

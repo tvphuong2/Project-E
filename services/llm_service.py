@@ -77,3 +77,33 @@ class LLMClient:
         content = data["choices"][0]["message"]["content"].strip()
         parts = [p.strip().strip(",.") for p in content.split(",")]
         return [p for p in parts if p and p.lower()!=word.lower()][:6]
+
+    def generate_sentence_pair(self, word: str) -> Dict[str, str]:
+        """Sinh 1 câu tiếng Việt và bản dịch tiếng Anh cho từ đang xét."""
+        if not self.api_key:
+            return {
+                "vi": f"Tôi đang học từ '{word}'",
+                "en": f"I am learning the word '{word}'"
+            }
+
+        prompt = (
+            "Provide a short Vietnamese sentence that naturally uses or relates to the word's meaning "
+            "and its English translation. Respond only as JSON with keys vi and en. Word: " + word
+        )
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "response_format": {"type": "json_object"}
+        }
+        try:
+            data = self._post(payload)
+            content = data["choices"][0]["message"]["content"].strip()
+            import json as _json
+            obj = _json.loads(content)
+            return {"vi": obj.get("vi", ""), "en": obj.get("en", "")}
+        except Exception:
+            return {
+                "vi": f"Tôi đang học từ '{word}'",
+                "en": f"I am learning the word '{word}'"
+            }

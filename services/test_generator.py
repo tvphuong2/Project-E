@@ -1,6 +1,8 @@
 import random
 from typing import List, Dict
 
+from services.llm_service import LLMClient
+
 class WordSampler:
     @staticmethod
     def sample_for_test(cards: List[Dict], k: int = 10) -> List[Dict]:
@@ -45,14 +47,52 @@ class ExerciseBuilder:
         }
 
     @staticmethod
-    def build_for_words(words: List[Dict], all_words: List[Dict]) -> List[Dict]:
-        # For each word, create 2 exercises: vi2en_mcq and type_from_meaning
+    def build_vi_sentence_input(word: Dict, llm: LLMClient) -> Dict:
+        pair = llm.generate_sentence_pair(word["word"]) if llm else {"vi": "", "en": ""}
+        return {
+            "type": "vi_sentence_input",
+            "word": word["word"],
+            "prompt_vi": pair.get("vi", ""),
+            "answer": pair.get("en", ""),
+        }
+
+    @staticmethod
+    def build_en_vi_match(word: Dict, all_words: List[Dict], llm: LLMClient):
+        similars = llm.generate_similar_or_confusables(word["word"]) if llm else []
+        words = [word["word"]] + similars[:4]
+        if len(words) < 5:
+            return None
+        pairs = []
+        for w in words:
+            meaning = next((c.get("meaning_vi", "") for c in all_words if c["word"].lower()==w.lower()), "")
+            if not meaning and llm:
+                meaning = llm.describe_word(w).get("meaning_vi", "")
+            pairs.append({"en": w, "vi": meaning})
+        en_words = [p["en"] for p in pairs]
+        vi_meanings = [p["vi"] for p in pairs]
+        random.shuffle(en_words)
+        random.shuffle(vi_meanings)
+        mapping = {p["en"]: p["vi"] for p in pairs}
+        return {
+            "type": "en_vi_match",
+            "word": word["word"],
+            "en_words": en_words,
+            "vi_meanings": vi_meanings,
+            "pairs": mapping,
+        }
+
+    @staticmethod
+    def build_for_words(words: List[Dict], all_words: List[Dict], llm: LLMClient) -> List[Dict]:
+        # For each word, create exercises: mcq, type_from_meaning, sentence translation, and matching
         all_lex = [w["word"] for w in all_words]
         items = []
         for w in words:
-            # distractors from other words or near-miss strings
             others = [x for x in all_lex if x.lower()!=w["word"].lower()]
             random.shuffle(others)
             items.append(ExerciseBuilder.build_vi2en_mcq(w, others))
             items.append(ExerciseBuilder.build_type_from_meaning(w))
+            items.append(ExerciseBuilder.build_vi_sentence_input(w, llm))
+            match = ExerciseBuilder.build_en_vi_match(w, all_words, llm)
+            if match:
+                items.append(match)
         return items
