@@ -26,6 +26,8 @@ def create_app():
         G_CSE_KEY=CONF.get("google_cse", {}).get("api_key"),
         G_CSE_CX=CONF.get("google_cse", {}).get("cx"),
         MAX_MIN=int(CONF.get("app", {}).get("max_attempt_duration_min", 30)),
+        TEST_WORD_COUNT=int(CONF.get("app", {}).get("test_word_count", 10)),
+        ANSWER_REVEAL_MS=int(CONF.get("app", {}).get("answer_reveal_ms", 1200)),
     )
 
     # ---- Clients (LLM / Image) ----

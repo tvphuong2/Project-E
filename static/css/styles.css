@@ -33,3 +33,7 @@ body.testing { padding: 0; }
 body.testing header { display: none; }
 #quiz .card { max-width: 800px; margin: 20px auto; }
 .match-row { align-items: center; }
+.wrong { color: #f66; }
+.correct { color: #6f6; }
+.miss { color: #f66; }
+.fb-ans { margin-top: 6px; padding: 4px 0; }

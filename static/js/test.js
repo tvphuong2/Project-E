@@ -5,9 +5,49 @@ let queue = [];
 let nextRound = [];
 let wrongCounts = {};
 let currentItem = null;
+const REVEAL_MS = window.ANSWER_REVEAL_MS || 1200;
 
 function normalizeSentence(s){
   return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function diffChars(user, correct){
+  const u = user.toLowerCase();
+  const c = correct.toLowerCase();
+  let res = '';
+  for(let i=0;i<correct.length;i++){
+    const uc = u[i];
+    const cc = c[i];
+    const disp = correct[i];
+    if(uc === cc){
+      res += `<span class="ok">${disp}</span>`;
+    }else if(typeof uc === 'undefined'){
+      res += `<span class="miss">_${disp}</span>`;
+    }else{
+      res += `<span class="wrong">${disp}</span>`;
+    }
+  }
+  return res;
+}
+
+function diffWords(user, correct){
+  const u = normalizeSentence(user).split(/\s+/);
+  const cClean = normalizeSentence(correct).split(/\s+/);
+  const cDisp = correct.trim().split(/\s+/);
+  let out = [];
+  for(let i=0;i<cClean.length;i++){
+    const uw = u[i];
+    const cw = cClean[i];
+    const disp = cDisp[i];
+    if(uw === cw){
+      out.push(`<span class="ok">${disp}</span>`);
+    }else if(typeof uw === 'undefined'){
+      out.push(`<span class="miss">_${disp}</span>`);
+    }else{
+      out.push(`<span class="wrong">${disp}</span>`);
+    }
+  }
+  return out.join(' ');
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -60,7 +100,7 @@ function renderItem(it, box){
       btn.textContent = opt;
       btn.addEventListener('click', ()=>{
         const correct = (opt === it.answer);
-        showFeedback(correct, it.answer);
+        showFeedback(correct, it.answer, opt);
       });
       opts.appendChild(btn);
       opts.appendChild(document.createTextNode(' '));
@@ -78,7 +118,7 @@ function renderItem(it, box){
       btn.addEventListener('click', ()=>{
         const v = inp.value.trim();
         const correct = (v.toLowerCase() === it.word.toLowerCase());
-        showFeedback(correct, it.word);
+        showFeedback(correct, it.word, v);
       });
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
       wrap.appendChild(btn);
@@ -91,10 +131,11 @@ function renderItem(it, box){
       btn.className = 'btn secondary';
       btn.textContent = 'Kiểm tra';
       const check = ()=>{
-        const v = normalizeSentence(inp.value);
+        const raw = inp.value;
+        const v = normalizeSentence(raw);
         const ans = normalizeSentence(it.answer);
         const correct = (v === ans);
-        showFeedback(correct, it.answer);
+        showFeedback(correct, it.answer, raw);
       };
       btn.addEventListener('click', check);
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.ctrlKey) check(); });
@@ -136,14 +177,23 @@ function renderItem(it, box){
   box.appendChild(wrap);
 }
 
-function showFeedback(correct, answer){
+function showFeedback(correct, answer, userInput=''){
   const fb = $('#fb');
-  fb.textContent = correct ? 'Đúng' : `Sai. Đáp án: ${answer}`;
-  if(!correct){
+  fb.innerHTML = '';
+  if(correct){
+    fb.innerHTML = '<span class="correct">Đúng</span>';
+  }else{
+    let ansHTML = answer;
+    if(currentItem.type === 'vi_sentence_input'){
+      ansHTML = diffWords(userInput, answer);
+    }else if(currentItem.type === 'type_from_meaning'){
+      ansHTML = diffChars(userInput, answer);
+    }
+    fb.innerHTML = `<div class="wrong">Sai</div><div class="fb-ans">${ansHTML}</div>`;
     wrongCounts[currentItem.word] = (wrongCounts[currentItem.word] || 0) + 1;
     nextRound.push(currentItem);
   }
-  setTimeout(showNext, 1200);
+  setTimeout(showNext, REVEAL_MS);
 }
 
 async function finalize(){

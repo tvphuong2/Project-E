@@ -2,8 +2,11 @@
 {% block content %}
 <div class="card" id="startCard">
   <h3>Bài test ôn từ</h3>
-  <button class="btn" id="btnStart">Bắt đầu (10 từ)</button>
+  <button class="btn" id="btnStart">Bắt đầu ({{ test_word_count }} từ)</button>
 </div>
 <div id="quiz" class="fullscreen hidden"></div>
+<script>
+  window.ANSWER_REVEAL_MS = {{ answer_ms }};
+</script>
 <script type="module" src="{{ url_for('static', filename='js/test.js') }}"></script>
 {% endblock %}

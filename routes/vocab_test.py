@@ -156,13 +156,16 @@ def vocab_enrich_all():
 @bp.get("/test")
 def get_test_page():
     "Trang bắt đầu bài test ôn từ (templates/test.html)."
-    return render_template("test.html", title="Test từ vựng")
+    k = current_app.config.get("TEST_WORD_COUNT", 10)
+    ans = current_app.config.get("ANSWER_REVEAL_MS", 1200)
+    return render_template("test.html", title="Test từ vựng", test_word_count=k, answer_ms=ans)
 
 @bp.post("/tests/start")
 def start_tests():
-    "Chọn 10 từ theo tỉ lệ 5/30/65, sinh bài tập." 
+    "Chọn số từ theo tỉ lệ 5/30/65, sinh bài tập."
     data = load_cards()
-    picked = WordSampler.sample_for_test(data["cards"], k=10)
+    k = current_app.config.get("TEST_WORD_COUNT", 10)
+    picked = WordSampler.sample_for_test(data["cards"], k=k)
     llm: LLMClient = current_app.config.get("LLM_CLIENT")
     items = ExerciseBuilder.build_for_words(picked, data["cards"], llm)
 
