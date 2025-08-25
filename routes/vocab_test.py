@@ -84,7 +84,7 @@ def vocab_save_selection():
         "id": str(uuid.uuid4()), "word": word.capitalize(),
         "status": "raw", "origin": "manual",
         "pos": "", "meaning_vi": "", "usage": "", "phonetic": "",
-        "image_url": None,
+        "image_url": None, "audio_url": None,
         "created_at": now, "updated_at": now,
         "memory_label": "", "stats": {"correct": 0, "wrong": 0}
     }
@@ -92,11 +92,18 @@ def vocab_save_selection():
     if bool(payload.get("enrich_now")):
         llm: LLMClient = current_app.config["LLM_CLIENT"]
         img = current_app.config["IMG_FETCHER"]
+        tts = current_app.config["TTS_CLIENT"]
         try:
             desc = llm.describe_word(card["word"]) if current_app.config["OPENAI_KEY"] else {}
             card["pos"] = desc.get("pos",""); card["meaning_vi"] = desc.get("meaning_vi","")
             card["usage"] = desc.get("usage",""); card["phonetic"] = desc.get("phonetic","")
             card["image_url"] = img.fetch(card["word"]) if (current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]) else None
+            if current_app.config["OPENAI_KEY"]:
+                audio_dir = __import__("os").path.join(current_app.config["CARDS_DIR"], "audio")
+                filename = f"{card['id']}.mp3"
+                full = __import__("os").path.join(audio_dir, filename)
+                if tts.synthesize_to_file(card["word"], full):
+                    card["audio_url"] = f"/data/cards/audio/{filename}"
             card["status"] = "enrich"; card["updated_at"] = _iso(_utcnow())
         except Exception:
             pass
@@ -104,6 +111,59 @@ def vocab_save_selection():
     data["cards"].append(card)
     save_cards(data)
     return jsonify({"ok": True, "message": "Đã lưu từ", "card": card})
+
+@bp.post("/vocab/fill_missing/<id_or_word>")
+def vocab_fill_missing(id_or_word: str):
+    """Fill missing fields (pos, meaning_vi, usage, phonetic, image, audio) for a card."""
+    ensure_card_ids()
+    key = (id_or_word or "").strip()
+    data = load_cards()
+    target = None
+    for c in data["cards"]:
+        if str(c.get("id")) == key or str(c.get("word", "")).lower() == key.lower():
+            target = c
+            break
+    if not target:
+        return jsonify({"error": "not found"}), 404
+
+    llm: LLMClient = current_app.config["LLM_CLIENT"]
+    img: ImageFetcher = current_app.config["IMG_FETCHER"]
+    tts = current_app.config["TTS_CLIENT"]
+    changed = False
+
+    if current_app.config["OPENAI_KEY"] and (not target.get("pos") or not target.get("meaning_vi") or not target.get("usage") or not target.get("phonetic")):
+        try:
+            desc = llm.describe_word(target["word"])
+            if not target.get("pos"): target["pos"] = desc.get("pos", "")
+            if not target.get("meaning_vi"): target["meaning_vi"] = desc.get("meaning_vi", "")
+            if not target.get("usage"): target["usage"] = desc.get("usage", "")
+            if not target.get("phonetic"): target["phonetic"] = desc.get("phonetic", "")
+            changed = True
+        except Exception:
+            pass
+
+    if (not target.get("image_url")) and current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]:
+        try:
+            target["image_url"] = img.fetch(target["word"])
+            changed = True
+        except Exception:
+            pass
+
+    if (not target.get("audio_url")) and current_app.config["OPENAI_KEY"]:
+        audio_dir = __import__("os").path.join(current_app.config["CARDS_DIR"], "audio")
+        filename = f"{target['id']}.mp3"
+        full = __import__("os").path.join(audio_dir, filename)
+        if tts.synthesize_to_file(target["word"], full):
+            target["audio_url"] = f"/data/cards/audio/{filename}"
+            changed = True
+
+    if changed:
+        if (target.get("status") or "").lower() == "raw":
+            target["status"] = "enrich"
+        target["updated_at"] = _iso(_utcnow())
+        save_cards(data)
+
+    return jsonify({"card": target, "updated": changed})
 
 @bp.post("/vocab/enrich_all")
 def vocab_enrich_all():
@@ -117,6 +177,7 @@ def vocab_enrich_all():
     data = load_cards()
     llm: LLMClient = current_app.config["LLM_CLIENT"]
     img: ImageFetcher = current_app.config["IMG_FETCHER"]
+    tts = current_app.config["TTS_CLIENT"]
 
     changed = 0
     now = _iso(_utcnow())
@@ -132,6 +193,12 @@ def vocab_enrich_all():
                 "image_url": img.fetch(c["word"]) if (current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]) else None,
                 "status": "enrich", "updated_at": now
             })
+            if current_app.config["OPENAI_KEY"]:
+                audio_dir = __import__("os").path.join(current_app.config["CARDS_DIR"], "audio")
+                filename = f"{c['id']}.mp3"
+                full = __import__("os").path.join(audio_dir, filename)
+                if tts.synthesize_to_file(c["word"], full):
+                    c["audio_url"] = f"/data/cards/audio/{filename}"
             changed += 1
 
             similars = llm.generate_similar_or_confusables(c["word"]) if current_app.config["OPENAI_KEY"] else []
@@ -139,12 +206,20 @@ def vocab_enrich_all():
                 if not any(x["word"].lower() == s.lower() for x in data["cards"]):
                     desc2 = llm.describe_word(s) if current_app.config["OPENAI_KEY"] else {"pos":"", "meaning_vi":"", "usage":"", "phonetic":""}
                     img2 = img.fetch(s) if (current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]) else None
+                    add_id = str(uuid.uuid4())
+                    audio_url = None
+                    if current_app.config["OPENAI_KEY"]:
+                        audio_dir = __import__("os").path.join(current_app.config["CARDS_DIR"], "audio")
+                        filename = f"{add_id}.mp3"
+                        full = __import__("os").path.join(audio_dir, filename)
+                        if tts.synthesize_to_file(s, full):
+                            audio_url = f"/data/cards/audio/{filename}"
                     data["cards"].append({
-                        "id": str(uuid.uuid4()), "word": s.capitalize(),
+                        "id": add_id, "word": s.capitalize(),
                         "status": "additional", "origin": "auto_additional",
                         "pos": desc2.get("pos",""), "meaning_vi": desc2.get("meaning_vi",""),
                         "usage": desc2.get("usage",""), "phonetic": desc2.get("phonetic",""),
-                        "image_url": img2,
+                        "image_url": img2, "audio_url": audio_url,
                         "created_at": now, "updated_at": now,
                         "memory_label": "", "stats": {"correct": 0, "wrong": 0}
                     })
@@ -153,17 +228,28 @@ def vocab_enrich_all():
 
 
 # ---------- BÀI TEST ----------
-@bp.get("/test")
-def test_page():
+#
+# Các hàm xử lý route dưới đây trước đây được đặt tên bắt đầu bằng
+# ``test_*``.  Điều này vô tình khiến ``pytest`` hiểu đây là các testcase
+# và cố gắng chạy chúng mà không có ngữ cảnh Flask thích hợp, dẫn tới lỗi
+# "Working outside of application/request context" khi chạy kiểm thử.
+#
+# Đổi tên các hàm để tránh bị thu thập bởi ``pytest``.  Để giữ nguyên tên
+# endpoint (phục vụ ``url_for`` nếu được dùng ở nơi khác) chúng ta chỉ định
+# tham số ``endpoint`` trong decorator.
+
+@bp.get("/test", endpoint="test_page")
+def vocab_test_page():
     "Trang bắt đầu bài test ôn từ (templates/test.html)."
     return render_template("test.html", title="Test từ vựng")
 
-@bp.post("/tests/start")
-def tests_start():
+@bp.post("/tests/start", endpoint="tests_start")
+def vocab_tests_start():
     "Chọn 10 từ theo tỉ lệ 5/30/65, sinh bài tập (MCQ + gõ từ)."
     data = load_cards()
     picked = WordSampler.sample_for_test(data["cards"], k=10)
     items = ExerciseBuilder.build_for_words(picked, data["cards"])
+    __import__('random').shuffle(items)
 
     session_id = str(uuid.uuid4())
     sess_path = __import__("os").path.join(current_app.config["TESTS_DIR"], f"{session_id}.json")
@@ -173,8 +259,8 @@ def tests_start():
 
     return jsonify({"session_id": session_id, "picked_words": [x["word"] for x in picked], "items": items})
 
-@bp.post("/tests/finalize")
-def tests_finalize():
+@bp.post("/tests/finalize", endpoint="tests_finalize")
+def vocab_tests_finalize():
     """
     Chốt phiên test (DEMO):
       - hiện tại gắn nhãn LTM cho các từ đã pick (bạn có thể nâng cấp logic wrong-only/nhãn sau).

@@ -37,6 +37,7 @@ function renderItems(items){
           $('#fb-'+idx).textContent = correct ? 'Đúng' : 'Sai';
           if(!correct) wrongIndices.add(idx);
           else wrongIndices.delete(idx);
+          playAudio(it.audio_url);
         });
         opts.appendChild(btn);
         opts.appendChild(document.createTextNode(' '));
@@ -54,6 +55,23 @@ function renderItems(items){
         $('#fb-'+idx).textContent = correct ? 'Đúng' : 'Sai (đáp án: '+it.word+')';
         if(!correct) wrongIndices.add(idx);
         else wrongIndices.delete(idx);
+        playAudio(it.audio_url);
+      });
+    }else if(it.type === 'audio_to_en'){
+      card.innerHTML = `
+        <div><b>[Nghe]</b> Nghe audio và gõ từ tiếng Anh</div>
+        <button class="btn secondary" id="play-${idx}">Phát</button>
+        <input type="text" id="in-${idx}"/>
+        <button class="btn secondary" id="chk-${idx}">Kiểm tra</button>
+        <div id="fb-${idx}" class="small mono"></div>
+      `;
+      card.querySelector('#play-'+idx).addEventListener('click', ()=> playAudio(it.audio_url));
+      card.querySelector('#chk-'+idx).addEventListener('click', ()=>{
+        const v = card.querySelector('#in-'+idx).value.trim();
+        const correct = (v.toLowerCase() === it.word.toLowerCase());
+        $('#fb-'+idx).textContent = correct ? 'Đúng' : 'Sai (đáp án: '+it.word+')';
+        if(!correct) wrongIndices.add(idx); else wrongIndices.delete(idx);
+        playAudio(it.audio_url);
       });
     }else{
       card.textContent = '(Bài tập khác sẽ được bổ sung)';
@@ -86,4 +104,12 @@ async function finalizeTest(){
   session.picked_words.forEach(w => labelSummary.LTM++);
   const res = await postJSON('/tests/finalize', { session_id: session.session_id, label_summary: labelSummary });
   alert('Đã cập nhật nhãn ghi nhớ. Tóm tắt: ' + JSON.stringify(labelSummary));
+}
+
+function playAudio(url){
+  if(!url) return;
+  try{
+    const a = new Audio(url);
+    a.play();
+  }catch(e){/* ignore */}
 }

@@ -130,10 +130,12 @@ async function showDetail(id, scrollIntoView){
     <div style="margin:8px 0;">
       <img src="${c.image_url}" alt="${c.word}" style="max-width:100%; border-radius:10px;">
     </div>` : '';
+  const audio = c.audio_url ? `<audio controls src="${c.audio_url}" style="width:100%; margin-top:8px;"></audio>` : '';
 
   $('#detailBody').innerHTML = `
     <div style="font-size:22px; font-weight:700;">${c.word || ''}</div>
     ${img}
+    ${audio}
     <div style="margin-top:6px;"><b>Phonetic:</b> ${c.phonetic || '—'}</div>
     <div><b>POS:</b> ${c.pos || '—'}</div>
     <div><b>Nghĩa (VI):</b> ${c.meaning_vi || '—'}</div>
@@ -141,11 +143,14 @@ async function showDetail(id, scrollIntoView){
     <div class="small mono" style="margin-top:8px;">
       Status: ${c.status || '—'} · Origin: ${c.origin || '—'} · Memory: ${c.memory_label || '—'}
     </div>
+    <button class="btn" id="btnFillMissing" style="margin-top:8px;">Bổ sung thiếu</button>
   `;
 
   if(scrollIntoView){
     document.getElementById('detailPanel').scrollIntoView({behavior:'smooth', block:'start'});
   }
+
+  $('#btnFillMissing').addEventListener('click', ()=> fillMissing(c.id));
 }
 
 /** ======== Actions ======== */
@@ -163,5 +168,17 @@ async function onEnrichAll(){
   }finally{
     btn.disabled = false;
     btn.textContent = 'Enrich All';
+  }
+}
+
+async function fillMissing(id){
+  try{
+    const res = await postJSON('/vocab/fill_missing/'+id, {});
+    alert(res.updated ? 'Đã bổ sung.' : 'Không có gì để bổ sung.');
+    await loadSummary();
+    applyFiltersAndRender();
+    showDetail(id, false);
+  }catch(e){
+    alert('Lỗi: '+e.message);
   }
 }
