@@ -33,7 +33,8 @@ class ExerciseBuilder:
             "word": word["word"],
             "prompt_vi": word.get("meaning_vi","(no meaning)"),
             "options": options,
-            "answer": word["word"]
+            "answer": word["word"],
+            "audio_url": word.get("audio_url")
         }
 
     @staticmethod
@@ -42,11 +43,20 @@ class ExerciseBuilder:
             "type": "type_from_meaning",
             "word": word["word"],
             "prompt_vi": word.get("meaning_vi","(no meaning)"),
+            "audio_url": word.get("audio_url")
+        }
+
+    @staticmethod
+    def build_audio_to_en(word: Dict) -> Dict:
+        return {
+            "type": "audio_to_en",
+            "word": word["word"],
+            "audio_url": word.get("audio_url")
         }
 
     @staticmethod
     def build_for_words(words: List[Dict], all_words: List[Dict]) -> List[Dict]:
-        # For each word, create 2 exercises: vi2en_mcq and type_from_meaning
+        # For each word, create exercises: vi2en_mcq, type_from_meaning and audio_to_en
         all_lex = [w["word"] for w in all_words]
         items = []
         for w in words:
@@ -55,4 +65,7 @@ class ExerciseBuilder:
             random.shuffle(others)
             items.append(ExerciseBuilder.build_vi2en_mcq(w, others))
             items.append(ExerciseBuilder.build_type_from_meaning(w))
+            if w.get("audio_url"):
+                items.append(ExerciseBuilder.build_audio_to_en(w))
+        random.shuffle(items)
         return items

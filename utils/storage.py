@@ -12,6 +12,7 @@ def bootstrap_data_dirs(app):
     """
     for k in ("LESSON_DIR", "CARDS_DIR", "TESTS_DIR"):
         os.makedirs(app.config[k], exist_ok=True)
+    os.makedirs(os.path.join(app.config["CARDS_DIR"], "audio"), exist_ok=True)
     # cards.json
     cp = os.path.join(app.config["CARDS_DIR"], "cards.json")
     if not os.path.isfile(cp):

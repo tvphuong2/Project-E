@@ -2,6 +2,7 @@ import os, json, uuid, yaml
 from flask import Flask, send_from_directory
 from services.llm_service import LLMClient
 from services.image_service import ImageFetcher
+from services.tts_service import TTSClient
 
 def create_app():
     BASE = os.path.dirname(__file__)
@@ -36,6 +37,10 @@ def create_app():
     app.config["IMG_FETCHER"] = ImageFetcher(
         api_key=app.config["G_CSE_KEY"],
         cx=app.config["G_CSE_CX"]
+    )
+    app.config["TTS_CLIENT"] = TTSClient(
+        api_key=app.config["OPENAI_KEY"],
+        model="gpt-4o-mini-tts"
     )
 
     # ---- Active session store (in-memory) ----
