@@ -14,6 +14,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 /** ======== UI Bindings ======== */
 function bindUI(){
+  $('#btnFillAll').addEventListener('click', onFillAll);
   $('#btnEnrichAll').addEventListener('click', onEnrichAll);
   $('#btnRefresh').addEventListener('click', async ()=>{ await loadSummary(); applyFiltersAndRender(); });
 
@@ -159,6 +160,23 @@ async function showDetail(id, scrollIntoView){
 }
 
 /** ======== Actions ======== */
+async function onFillAll(){
+  const btn = $('#btnFillAll');
+  btn.disabled = true;
+  btn.textContent = 'Đang bổ sung...';
+  try{
+    const res = await postJSON('/vocab/fill_missing_all', {});
+    alert(res.message || 'Đã bổ sung xong');
+    await loadSummary();
+    applyFiltersAndRender();
+  }catch(e){
+    alert('Lỗi bổ sung: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Bổ sung tất cả';
+  }
+}
+
 async function onEnrichAll(){
   const btn = $('#btnEnrichAll');
   btn.disabled = true;

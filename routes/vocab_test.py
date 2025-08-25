@@ -225,6 +225,54 @@ def vocab_fill_missing(id_or_word):
     return jsonify({"card": card, "updated": updated})
 
 
+@bp.post("/vocab/fill_missing_all")
+def vocab_fill_missing_all():
+    """Fill missing fields for all cards that lack data."""
+    ensure_card_ids()
+    data = load_cards()
+    llm: LLMClient = current_app.config["LLM_CLIENT"]
+    img: ImageFetcher = current_app.config["IMG_FETCHER"]
+    tts: TTSService = current_app.config["TTS_CLIENT"]
+    updated_count = 0
+    now = _iso(_utcnow())
+
+    for card in data["cards"]:
+        updated = False
+        try:
+            if current_app.config["OPENAI_KEY"] and (not card.get("pos") or not card.get("meaning_vi") or not card.get("usage") or not card.get("phonetic")):
+                desc = llm.describe_word(card["word"])
+                card["pos"] = card.get("pos") or desc.get("pos", "")
+                card["meaning_vi"] = card.get("meaning_vi") or desc.get("meaning_vi", "")
+                card["usage"] = card.get("usage") or desc.get("usage", "")
+                card["phonetic"] = card.get("phonetic") or desc.get("phonetic", "")
+                updated = True
+        except Exception:
+            pass
+
+        if not card.get("image_url") and current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]:
+            try:
+                card["image_url"] = img.fetch(card["word"])
+                if card["image_url"]:
+                    updated = True
+            except Exception:
+                pass
+
+        if not card.get("audio_url") and current_app.config["OPENAI_KEY"]:
+            aud_path = os.path.join(current_app.config["CARDS_DIR"], "audio", f"{card['id']}.mp3")
+            if tts.synthesize(card["word"], aud_path):
+                card["audio_url"] = f"/data/cards/audio/{card['id']}.mp3"
+                updated = True
+
+        if updated:
+            card["updated_at"] = now
+            updated_count += 1
+
+    if updated_count:
+        save_cards(data)
+
+    return jsonify({"updated": updated_count, "message": f"Filled {updated_count} cards"})
+
+
 # ---------- BÀI TEST ----------
 @bp.get("/test")
 def get_test_page():
