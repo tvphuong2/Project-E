@@ -4,9 +4,13 @@
   <h3>Bài test ôn từ</h3>
   <button class="btn" id="btnStart">Bắt đầu ({{ test_word_count }} từ)</button>
 </div>
-<div id="quiz" class="fullscreen hidden"></div>
+<div id="quiz" class="fullscreen hidden">
+  <div id="hud" class="flex"><span>Còn <span id="remain">0</span> câu</span><span id="timer">0:00</span></div>
+  <div id="cardArea"></div>
+</div>
 <script>
   window.ANSWER_REVEAL_MS = {{ answer_ms }};
+  window.MAX_MIN = {{ max_min }};
 </script>
 <script type="module" src="{{ url_for('static', filename='js/test.js') }}"></script>
 {% endblock %}

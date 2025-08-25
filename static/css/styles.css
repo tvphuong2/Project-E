@@ -37,3 +37,4 @@ body.testing header { display: none; }
 .correct { color: #6f6; }
 .miss { color: #f66; }
 .fb-ans { margin-top: 6px; padding: 4px 0; }
+#hud { display:flex; justify-content:space-between; margin-bottom:12px; }

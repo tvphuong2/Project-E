@@ -279,7 +279,8 @@ def get_test_page():
     "Trang bắt đầu bài test ôn từ (templates/test.html)."
     k = current_app.config.get("TEST_WORD_COUNT", 10)
     ans = current_app.config.get("ANSWER_REVEAL_MS", 1200)
-    return render_template("test.html", title="Test từ vựng", test_word_count=k, answer_ms=ans)
+    max_min = current_app.config.get("MAX_MIN", 30)
+    return render_template("test.html", title="Test từ vựng", test_word_count=k, answer_ms=ans, max_min=max_min)
 
 @bp.post("/tests/start")
 def start_tests():
@@ -288,7 +289,8 @@ def start_tests():
     k = current_app.config.get("TEST_WORD_COUNT", 10)
     picked = WordSampler.sample_for_test(data["cards"], k=k)
     llm: LLMClient = current_app.config.get("LLM_CLIENT")
-    items = ExerciseBuilder.build_for_words(picked, data["cards"], llm)
+    enabled = current_app.config.get("ENABLED_EXERCISE_TYPES") or []
+    items = ExerciseBuilder.build_for_words(picked, data["cards"], llm, enabled)
 
     session_id = str(uuid.uuid4())
     sess_path = __import__("os").path.join(current_app.config["TESTS_DIR"], f"{session_id}.json")

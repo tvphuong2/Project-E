@@ -7,6 +7,10 @@ let wrongCounts = {};
 let currentItem = null;
 const REVEAL_MS = window.ANSWER_REVEAL_MS || 1200;
 let audioPlayer = null;
+let hudRemain, hudTimer, cardArea;
+let startTime = 0;
+let timerInterval = null;
+let maxSec = (window.MAX_MIN || 30) * 60;
 
 function normalizeSentence(s){
   return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
@@ -65,12 +69,18 @@ async function startTest(){
   const quiz = $('#quiz');
   quiz.classList.remove('hidden');
   document.body.classList.add('testing');
+  hudRemain = $('#remain');
+  hudTimer = $('#timer');
+  cardArea = $('#cardArea');
+  startTime = Date.now();
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 1000);
+  updateHUD();
   showNext();
 }
 
 function showNext(){
-  const box = $('#quiz');
-  box.innerHTML = '';
+  cardArea.innerHTML = '';
   if(queue.length === 0){
     if(nextRound.length === 0){
       finalize();
@@ -80,13 +90,15 @@ function showNext(){
       nextRound = [];
       const note = document.createElement('div');
       note.textContent = `Làm lại các câu sai (${queue.length})`;
-      box.appendChild(note);
+      cardArea.appendChild(note);
+      updateHUD();
       setTimeout(showNext, 1000);
       return;
     }
   }
   currentItem = queue.shift();
-  renderItem(currentItem, box);
+  renderItem(currentItem, cardArea);
+  updateHUD();
 }
 
 function renderItem(it, box){
@@ -232,5 +244,28 @@ async function finalize(){
   $('#startCard').classList.remove('hidden');
   const quiz = $('#quiz');
   quiz.classList.add('hidden');
-  quiz.innerHTML = '';
+  clearInterval(timerInterval);
+  if(cardArea) cardArea.innerHTML = '';
+  if(hudRemain) hudRemain.textContent = '0';
+  if(hudTimer) hudTimer.textContent = '0:00';
+}
+
+function updateHUD(){
+  if(!hudRemain) return;
+  const remaining = queue.length + nextRound.length + (currentItem ? 1 : 0);
+  hudRemain.textContent = remaining;
+}
+
+function updateTimer(){
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const left = Math.max(0, maxSec - elapsed);
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  if(hudTimer){
+    hudTimer.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  }
+  if(left <= 0){
+    clearInterval(timerInterval);
+    finalize();
+  }
 }

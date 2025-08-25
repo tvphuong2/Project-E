@@ -30,6 +30,7 @@ def create_app():
         TEST_WORD_COUNT=int(CONF.get("app", {}).get("test_word_count", 10)),
         ANSWER_REVEAL_MS=int(CONF.get("app", {}).get("answer_reveal_ms", 1200)),
         OPENAI_TTS_MODEL=CONF.get("openai", {}).get("tts_model", "gpt-4o-mini-tts"),
+        ENABLED_EXERCISE_TYPES=CONF.get("app", {}).get("enabled_exercise_types", []),
     )
 
     # ---- Clients (LLM / Image) ----

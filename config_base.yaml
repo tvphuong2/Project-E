@@ -15,3 +15,9 @@ app:
   debug: true
   test_word_count: 10
   answer_reveal_ms: 1200
+  enabled_exercise_types:
+    - vi2en_mcq
+    - type_from_meaning
+    - vi_sentence_input
+    - en_vi_match
+    - audio2en_input

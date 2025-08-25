@@ -40,7 +40,8 @@ class LLMClient:
 
         prompt = (
             "For the English vocabulary word below, return a compact JSON object ONLY with keys: "
-            "pos (part of speech), meaning_vi (Vietnamese meaning), usage (1 short example sentence), phonetic (IPA). "
+            "pos (part of speech), meaning_vi (Vietnamese explanation describing how the word is used, not just a short translation), "
+            "usage (1 short example sentence showing context), phonetic (IPA). "
             "Do not include any commentary. Word: " + word
         )
 

@@ -105,20 +105,27 @@ class ExerciseBuilder:
         }
 
     @staticmethod
-    def build_for_words(words: List[Dict], all_words: List[Dict], llm: LLMClient) -> List[Dict]:
-        # For each word, create exercises: mcq, type_from_meaning, sentence translation, matching, audio
+    def build_for_words(words: List[Dict], all_words: List[Dict], llm: LLMClient, enabled_types: List[str]) -> List[Dict]:
+        """Create exercises for each word, filtered by enabled_types."""
         all_lex = [w["word"] for w in all_words]
+        enabled = set(enabled_types or [])
+        if not enabled:
+            enabled = {"vi2en_mcq", "type_from_meaning", "vi_sentence_input", "en_vi_match", "audio2en_input"}
         items = []
         for w in words:
-            others = [x for x in all_lex if x.lower()!=w["word"].lower()]
+            others = [x for x in all_lex if x.lower() != w["word"].lower()]
             random.shuffle(others)
-            items.append(ExerciseBuilder.build_vi2en_mcq(w, others))
-            items.append(ExerciseBuilder.build_type_from_meaning(w))
-            items.append(ExerciseBuilder.build_vi_sentence_input(w, llm))
-            match = ExerciseBuilder.build_en_vi_match(w, all_words, llm)
-            if match:
-                items.append(match)
-            if w.get("audio_url"):
+            if "vi2en_mcq" in enabled:
+                items.append(ExerciseBuilder.build_vi2en_mcq(w, others))
+            if "type_from_meaning" in enabled:
+                items.append(ExerciseBuilder.build_type_from_meaning(w))
+            if "vi_sentence_input" in enabled:
+                items.append(ExerciseBuilder.build_vi_sentence_input(w, llm))
+            if "en_vi_match" in enabled:
+                match = ExerciseBuilder.build_en_vi_match(w, all_words, llm)
+                if match:
+                    items.append(match)
+            if "audio2en_input" in enabled and w.get("audio_url"):
                 items.append(ExerciseBuilder.build_audio_to_en(w))
         random.shuffle(items)
         return items
