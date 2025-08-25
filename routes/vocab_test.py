@@ -7,6 +7,7 @@ from services.image_service import ImageFetcher
 from services.tts_service import TTSService
 from services.test_generator import WordSampler, ExerciseBuilder
 from utils.storage import load_cards, save_cards, ensure_card_ids
+from utils.test_utils import finalize_session
 from utils.timeutil import _utcnow, _iso
 
 bp = Blueprint("vocab_test", __name__)
@@ -309,63 +310,18 @@ def start_tests():
 @bp.post("/tests/finalize")
 def finalize_tests():
     """Finalize test session: update memory labels & save history."""
-    import os, json, datetime as dt
     body = request.get_json(force=True)
     sid = body.get("session_id")
     results = body.get("results") or {}
-    sess_path = os.path.join(current_app.config["TESTS_DIR"], f"{sid}.json")
-    if not os.path.isfile(sess_path):
+
+    try:
+        label_summary, duration_sec, total_retakes = finalize_session(sid, results)
+    except FileNotFoundError:
         return jsonify({"error": "session not found"}), 404
 
-    with open(sess_path, "r", encoding="utf-8") as f:
-        sess = json.load(f)
-    sess["results"] = results
-    with open(sess_path, "w", encoding="utf-8") as f:
-        json.dump(sess, f, ensure_ascii=False, indent=2)
-
-    data = load_cards()
-    label_summary = {"LTM":0, "STM":0, "REVIEW":0}
-    for w in sess.get("picked_words", []):
-        wrong = int(results.get(w, 0))
-        label = "LTM" if wrong == 0 else ("STM" if wrong == 1 else "REVIEW")
-        label_summary[label] += 1
-        for c in data["cards"]:
-            if c["word"].lower() == w.lower():
-                c["memory_label"] = label
-                c["updated_at"] = _iso(_utcnow())
-                stats = c.get("stats") or {"correct":0, "wrong":0}
-                if wrong == 0:
-                    stats["correct"] = stats.get("correct",0) + 1
-                else:
-                    stats["wrong"] = stats.get("wrong",0) + 1
-                c["stats"] = stats
-    save_cards(data)
-
-    # compute stats
-    total_retakes = sum(int(results.get(w,0)) for w in sess.get("picked_words", []))
-    start = sess.get("started_at")
-    try:
-        start_dt = dt.datetime.fromisoformat(start.replace('Z','')) if start else None
-        duration_sec = int((_utcnow() - start_dt).total_seconds()) if start_dt else None
-    except Exception:
-        duration_sec = None
-
-    # append to user stats history
-    usp = current_app.config["USER_STATS_PATH"]
-    if os.path.isfile(usp):
-        with open(usp, "r", encoding="utf-8") as f:
-            ustats = json.load(f)
-    else:
-        ustats = {"lessons": {}, "tests": []}
-    ustats.setdefault("tests", []).append({
-        "session_id": sid,
-        "started_at": start,
-        "finished_at": _iso(_utcnow()),
+    return jsonify({
+        "message": "Đã lưu kết quả",
+        "label_summary": label_summary,
         "duration_sec": duration_sec,
         "retakes": total_retakes,
-        "results": {w: {"wrong": int(results.get(w,0)), "label": "LTM" if int(results.get(w,0)) == 0 else ("STM" if int(results.get(w,0)) == 1 else "REVIEW")} for w in sess.get("picked_words", [])}
     })
-    with open(usp, "w", encoding="utf-8") as f:
-        json.dump(ustats, f, ensure_ascii=False, indent=2)
-
-    return jsonify({"message": "Đã lưu kết quả", "label_summary": label_summary, "duration_sec": duration_sec, "retakes": total_retakes})
