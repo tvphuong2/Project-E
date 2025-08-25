@@ -34,8 +34,8 @@ def normalize_text_basic(text: str) -> str:
     for c, full in CONTRACTIONS.items():
         t = re.sub(rf"\b{re.escape(c)}\b", full, t)
     t = _expand_numbers(t)
-    # remove special chars but keep comma and period
-    t = re.sub(r"[^a-z0-9,\.\s]", " ", t)
+    # remove punctuation and special chars
+    t = re.sub(r"[^a-z0-9\s]", " ", t)
     # collapse spaces
     t = re.sub(r"\s+", " ", t).strip()
     return t
@@ -43,6 +43,6 @@ def normalize_text_basic(text: str) -> str:
 def normalize_for_scoring(text: str, llm=None) -> str:
     """
     If llm is provided, you can add stronger cleanup/paraphrase. For now we do rule-based.
-    Keeping only comma and period. Lowercase for fair WER.
+    Lowercase and strip punctuation for fair WER.
     """
     return normalize_text_basic(text)

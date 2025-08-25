@@ -16,6 +16,21 @@ function normalizeSentence(s){
   return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
 }
 
+function normalizeWord(w){
+  return w.toLowerCase().replace(/[.,!?]/g,'').trim();
+}
+
+function wordEquals(user, correct, pos=''){
+  const u = normalizeWord(user);
+  const c = normalizeWord(correct);
+  if(u === c) return true;
+  const p = (pos || '').toLowerCase();
+  if(p.startsWith('n') || p.startsWith('v')){
+    if(u + 's' === c || u === c + 's') return true;
+  }
+  return false;
+}
+
 function diffChars(user, correct){
   const u = user.toLowerCase();
   const c = correct.toLowerCase();
@@ -112,7 +127,7 @@ function renderItem(it, box){
       btn.className = 'btn secondary';
       btn.textContent = opt;
       btn.addEventListener('click', ()=>{
-        const correct = (opt === it.answer);
+        const correct = wordEquals(opt, it.answer, it.pos);
         showFeedback(correct, it.answer, opt);
       });
       opts.appendChild(btn);
@@ -130,7 +145,7 @@ function renderItem(it, box){
       btn.textContent = 'Kiểm tra';
       btn.addEventListener('click', ()=>{
         const v = inp.value.trim();
-        const correct = (v.toLowerCase() === it.word.toLowerCase());
+        const correct = wordEquals(v, it.word, it.pos);
         showFeedback(correct, it.word, v);
       });
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
@@ -195,7 +210,7 @@ function renderItem(it, box){
       btn.textContent = 'Kiểm tra';
       btn.addEventListener('click', ()=>{
         const v = inp.value.trim();
-        const correct = (v.toLowerCase() === it.word.toLowerCase());
+        const correct = wordEquals(v, it.word, it.pos);
         showFeedback(correct, it.word, v);
       });
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
