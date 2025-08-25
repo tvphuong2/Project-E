@@ -2,6 +2,7 @@
 openai:
   api_key: "..."
   model: "..."   # or any model you prefer
+  tts_model: "gpt-4o-mini-tts"
 
 google_cse:
   api_key: "..."

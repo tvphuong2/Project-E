@@ -36,7 +36,8 @@ class ExerciseBuilder:
             "prompt_vi": word.get("meaning_vi", "(no meaning)"),
             "options": options,
             "answer": word["word"],
-            "pos": word.get("pos", "")
+            "pos": word.get("pos", ""),
+            "audio_url": word.get("audio_url"),
         }
 
     @staticmethod
@@ -46,6 +47,7 @@ class ExerciseBuilder:
             "word": word["word"],
             "prompt_vi": word.get("meaning_vi", "(no meaning)"),
             "pos": word.get("pos", ""),
+            "audio_url": word.get("audio_url"),
         }
 
     @staticmethod
@@ -90,11 +92,21 @@ class ExerciseBuilder:
             "vi_meanings": vi_meanings,
             "pairs": mapping,
             "pos_map": pos_map,
+            "audio_url": word.get("audio_url"),
+        }
+
+    @staticmethod
+    def build_audio_to_en(word: Dict) -> Dict:
+        return {
+            "type": "audio2en_input",
+            "word": word["word"],
+            "audio_url": word.get("audio_url"),
+            "pos": word.get("pos", ""),
         }
 
     @staticmethod
     def build_for_words(words: List[Dict], all_words: List[Dict], llm: LLMClient) -> List[Dict]:
-        # For each word, create exercises: mcq, type_from_meaning, sentence translation, and matching
+        # For each word, create exercises: mcq, type_from_meaning, sentence translation, matching, audio
         all_lex = [w["word"] for w in all_words]
         items = []
         for w in words:
@@ -106,4 +118,7 @@ class ExerciseBuilder:
             match = ExerciseBuilder.build_en_vi_match(w, all_words, llm)
             if match:
                 items.append(match)
+            if w.get("audio_url"):
+                items.append(ExerciseBuilder.build_audio_to_en(w))
+        random.shuffle(items)
         return items

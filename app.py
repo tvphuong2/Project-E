@@ -2,6 +2,7 @@ import os, json, uuid, yaml
 from flask import Flask, send_from_directory
 from services.llm_service import LLMClient
 from services.image_service import ImageFetcher
+from services.tts_service import TTSService
 
 def create_app():
     BASE = os.path.dirname(__file__)
@@ -28,6 +29,7 @@ def create_app():
         MAX_MIN=int(CONF.get("app", {}).get("max_attempt_duration_min", 30)),
         TEST_WORD_COUNT=int(CONF.get("app", {}).get("test_word_count", 10)),
         ANSWER_REVEAL_MS=int(CONF.get("app", {}).get("answer_reveal_ms", 1200)),
+        OPENAI_TTS_MODEL=CONF.get("openai", {}).get("tts_model", "gpt-4o-mini-tts"),
     )
 
     # ---- Clients (LLM / Image) ----
@@ -38,6 +40,10 @@ def create_app():
     app.config["IMG_FETCHER"] = ImageFetcher(
         api_key=app.config["G_CSE_KEY"],
         cx=app.config["G_CSE_CX"]
+    )
+    app.config["TTS_CLIENT"] = TTSService(
+        api_key=app.config["OPENAI_KEY"],
+        model=app.config["OPENAI_TTS_MODEL"]
     )
 
     # ---- Active session store (in-memory) ----

@@ -1,8 +1,10 @@
 # routes\vocab_test.py
 import uuid, re
+import os
 from flask import Blueprint, current_app, render_template, request, jsonify
 from services.llm_service import LLMClient
 from services.image_service import ImageFetcher
+from services.tts_service import TTSService
 from services.test_generator import WordSampler, ExerciseBuilder
 from utils.storage import load_cards, save_cards, ensure_card_ids
 from utils.timeutil import _utcnow, _iso
@@ -85,6 +87,7 @@ def vocab_save_selection():
         "status": "raw", "origin": "manual",
         "pos": "", "meaning_vi": "", "usage": "", "phonetic": "",
         "image_url": None,
+        "audio_url": None,
         "created_at": now, "updated_at": now,
         "memory_label": "", "stats": {"correct": 0, "wrong": 0}
     }
@@ -92,11 +95,16 @@ def vocab_save_selection():
     if bool(payload.get("enrich_now")):
         llm: LLMClient = current_app.config["LLM_CLIENT"]
         img = current_app.config["IMG_FETCHER"]
+        tts: TTSService = current_app.config["TTS_CLIENT"]
         try:
             desc = llm.describe_word(card["word"]) if current_app.config["OPENAI_KEY"] else {}
             card["pos"] = desc.get("pos",""); card["meaning_vi"] = desc.get("meaning_vi","")
             card["usage"] = desc.get("usage",""); card["phonetic"] = desc.get("phonetic","")
             card["image_url"] = img.fetch(card["word"]) if (current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]) else None
+            if current_app.config["OPENAI_KEY"]:
+                aud_path = os.path.join(current_app.config["CARDS_DIR"], "audio", f"{card['id']}.mp3")
+                if tts.synthesize(card["word"], aud_path):
+                    card["audio_url"] = f"/data/cards/audio/{card['id']}.mp3"
             card["status"] = "enrich"; card["updated_at"] = _iso(_utcnow())
         except Exception:
             pass
@@ -117,6 +125,7 @@ def vocab_enrich_all():
     data = load_cards()
     llm: LLMClient = current_app.config["LLM_CLIENT"]
     img: ImageFetcher = current_app.config["IMG_FETCHER"]
+    tts: TTSService = current_app.config["TTS_CLIENT"]
 
     changed = 0
     now = _iso(_utcnow())
@@ -130,8 +139,13 @@ def vocab_enrich_all():
                 "usage": desc.get("usage",""),
                 "phonetic": desc.get("phonetic",""),
                 "image_url": img.fetch(c["word"]) if (current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]) else None,
+                "audio_url": None,
                 "status": "enrich", "updated_at": now
             })
+            if current_app.config["OPENAI_KEY"]:
+                aud_path = os.path.join(current_app.config["CARDS_DIR"], "audio", f"{c['id']}.mp3")
+                if tts.synthesize(c["word"], aud_path):
+                    c["audio_url"] = f"/data/cards/audio/{c['id']}.mp3"
             changed += 1
 
             similars = llm.generate_similar_or_confusables(c["word"]) if current_app.config["OPENAI_KEY"] else []
@@ -139,17 +153,76 @@ def vocab_enrich_all():
                 if not any(x["word"].lower() == s.lower() for x in data["cards"]):
                     desc2 = llm.describe_word(s) if current_app.config["OPENAI_KEY"] else {"pos":"", "meaning_vi":"", "usage":"", "phonetic":""}
                     img2 = img.fetch(s) if (current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]) else None
+                    new_id = str(uuid.uuid4())
+                    audio_url = None
+                    if current_app.config["OPENAI_KEY"]:
+                        aud_path2 = os.path.join(current_app.config["CARDS_DIR"], "audio", f"{new_id}.mp3")
+                        if tts.synthesize(s, aud_path2):
+                            audio_url = f"/data/cards/audio/{new_id}.mp3"
                     data["cards"].append({
-                        "id": str(uuid.uuid4()), "word": s.capitalize(),
+                        "id": new_id, "word": s.capitalize(),
                         "status": "additional", "origin": "auto_additional",
                         "pos": desc2.get("pos",""), "meaning_vi": desc2.get("meaning_vi",""),
                         "usage": desc2.get("usage",""), "phonetic": desc2.get("phonetic",""),
                         "image_url": img2,
+                        "audio_url": audio_url,
                         "created_at": now, "updated_at": now,
                         "memory_label": "", "stats": {"correct": 0, "wrong": 0}
                     })
     save_cards(data)
     return jsonify({"message": f"Enriched {changed} raw cards (including additional w/ details)"})
+
+
+@bp.post("/vocab/fill_missing/<id_or_word>")
+def vocab_fill_missing(id_or_word):
+    """Fill missing fields (meaning, pos, image, audio) for a single card."""
+    ensure_card_ids()
+    key = (id_or_word or "").strip()
+    data = load_cards()
+    card = None
+    for c in data["cards"]:
+        if str(c.get("id")) == key or str(c.get("word", "")).lower() == key.lower():
+            card = c
+            break
+    if not card:
+        return jsonify({"error": "not found"}), 404
+
+    llm: LLMClient = current_app.config["LLM_CLIENT"]
+    img: ImageFetcher = current_app.config["IMG_FETCHER"]
+    tts: TTSService = current_app.config["TTS_CLIENT"]
+    updated = False
+    now = _iso(_utcnow())
+
+    try:
+        if current_app.config["OPENAI_KEY"] and (not card.get("pos") or not card.get("meaning_vi") or not card.get("usage") or not card.get("phonetic")):
+            desc = llm.describe_word(card["word"])
+            card["pos"] = card.get("pos") or desc.get("pos", "")
+            card["meaning_vi"] = card.get("meaning_vi") or desc.get("meaning_vi", "")
+            card["usage"] = card.get("usage") or desc.get("usage", "")
+            card["phonetic"] = card.get("phonetic") or desc.get("phonetic", "")
+            updated = True
+    except Exception:
+        pass
+
+    if not card.get("image_url") and current_app.config["G_CSE_KEY"] and current_app.config["G_CSE_CX"]:
+        try:
+            card["image_url"] = img.fetch(card["word"])
+            if card["image_url"]:
+                updated = True
+        except Exception:
+            pass
+
+    if not card.get("audio_url") and current_app.config["OPENAI_KEY"]:
+        aud_path = os.path.join(current_app.config["CARDS_DIR"], "audio", f"{card['id']}.mp3")
+        if tts.synthesize(card["word"], aud_path):
+            card["audio_url"] = f"/data/cards/audio/{card['id']}.mp3"
+            updated = True
+
+    if updated:
+        card["updated_at"] = now
+        save_cards(data)
+
+    return jsonify({"card": card, "updated": updated})
 
 
 # ---------- BÀI TEST ----------

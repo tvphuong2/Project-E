@@ -6,6 +6,7 @@ let nextRound = [];
 let wrongCounts = {};
 let currentItem = null;
 const REVEAL_MS = window.ANSWER_REVEAL_MS || 1200;
+let audioPlayer = null;
 
 function normalizeSentence(s){
   return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
@@ -122,7 +123,7 @@ function renderItem(it, box){
       });
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
       wrap.appendChild(btn);
-    }else if(it.type === 'vi_sentence_input'){
+  }else if(it.type === 'vi_sentence_input'){
       wrap.innerHTML = `<div><b>[Dịch câu]</b> ${it.pos ? '('+it.pos+') ' : ''}${it.prompt_vi}</div>`;
       const inp = document.createElement('textarea');
       inp.id = 'ans';
@@ -167,6 +168,26 @@ function renderItem(it, box){
         showFeedback(ok, ans);
       });
       wrap.appendChild(btn);
+    }else if(it.type === 'audio2en_input'){
+      wrap.innerHTML = `<div><b>[Nghe]</b> Viết lại từ tiếng Anh nghe được${it.pos ? ' ('+it.pos+')' : ''}</div>`;
+      const aud = document.createElement('audio');
+      aud.src = it.audio_url;
+      aud.controls = true;
+      wrap.appendChild(aud);
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'ans';
+      wrap.appendChild(inp);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      btn.addEventListener('click', ()=>{
+        const v = inp.value.trim();
+        const correct = (v.toLowerCase() === it.word.toLowerCase());
+        showFeedback(correct, it.word, v);
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
+      wrap.appendChild(btn);
     }else{
       wrap.textContent = '(Bài tập khác sẽ được bổ sung)';
     }
@@ -192,6 +213,10 @@ function showFeedback(correct, answer, userInput=''){
     fb.innerHTML = `<div class="wrong">Sai</div><div class="fb-ans">${ansHTML}</div>`;
     wrongCounts[currentItem.word] = (wrongCounts[currentItem.word] || 0) + 1;
     nextRound.push(currentItem);
+  }
+  if(currentItem.audio_url && currentItem.type !== 'vi_sentence_input'){
+    audioPlayer = new Audio(currentItem.audio_url);
+    audioPlayer.play().catch(()=>{});
   }
   setTimeout(showNext, REVEAL_MS);
 }
