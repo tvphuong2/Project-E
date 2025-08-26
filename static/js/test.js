@@ -121,6 +121,12 @@ function renderItem(it, box){
   wrap.className = 'card';
   if(it.type === 'vi2en_mcq'){
     wrap.innerHTML = `<div><b>[MCQ]</b> ${it.pos ? '('+it.pos+') ' : ''}Dịch sang tiếng Anh: <i>${it.prompt_vi}</i></div>`;
+    if(it.image_url){
+      const img = document.createElement('img');
+      img.src = it.image_url;
+      img.className = 'quiz-img';
+      wrap.appendChild(img);
+    }
     const opts = document.createElement('div');
     it.options.forEach(opt=>{
       const btn = document.createElement('button');
@@ -136,6 +142,12 @@ function renderItem(it, box){
     wrap.appendChild(opts);
     }else if(it.type === 'type_from_meaning'){
       wrap.innerHTML = `<div><b>[Gõ từ]</b> ${it.pos ? '('+it.pos+') ' : ''}Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>`;
+      if(it.image_url){
+        const img = document.createElement('img');
+        img.src = it.image_url;
+        img.className = 'quiz-img';
+        wrap.appendChild(img);
+      }
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.id = 'ans';
@@ -169,27 +181,50 @@ function renderItem(it, box){
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.ctrlKey) check(); });
       wrap.appendChild(btn);
     }else if(it.type === 'en_vi_match'){
-      wrap.innerHTML = `<div><b>[Nối từ]</b> Ghép từ tiếng Anh với nghĩa tiếng Việt</div>`;
+      wrap.innerHTML = `<div><b>[Nối từ]</b> Kéo nghĩa tiếng Việt vào đúng từ tiếng Anh</div>`;
       const selects = {};
+      const rows = document.createElement('div');
       it.en_words.forEach(en=>{
         const row = document.createElement('div');
         row.className = 'flex match-row';
         const sp = document.createElement('div');
         sp.textContent = en + (it.pos_map && it.pos_map[en] ? ` (${it.pos_map[en]})` : '');
         row.appendChild(sp);
-        const sel = document.createElement('select');
-        sel.innerHTML = '<option value="">--Chọn--</option>' + it.vi_meanings.map(v=>`<option value="${v}">${v}</option>`).join('');
-        row.appendChild(sel);
-        wrap.appendChild(row);
-        selects[en] = sel;
+        const dz = document.createElement('div');
+        dz.className = 'dropzone';
+        dz.dataset.en = en;
+        dz.addEventListener('dragover', e=>e.preventDefault());
+        dz.addEventListener('drop', e=>{
+          e.preventDefault();
+          const vi = e.dataTransfer.getData('text/plain');
+          dz.textContent = vi;
+          dz.dataset.vi = vi;
+        });
+        row.appendChild(dz);
+        rows.appendChild(row);
+        selects[en] = dz;
       });
+      wrap.appendChild(rows);
+      const pool = document.createElement('div');
+      pool.className = 'vi-pool';
+      it.vi_meanings.forEach(v=>{
+        const d = document.createElement('div');
+        d.className = 'drag-item';
+        d.textContent = v;
+        d.draggable = true;
+        d.addEventListener('dragstart', e=>{
+          e.dataTransfer.setData('text/plain', v);
+        });
+        pool.appendChild(d);
+      });
+      wrap.appendChild(pool);
       const btn = document.createElement('button');
       btn.className = 'btn secondary';
       btn.textContent = 'Kiểm tra';
       btn.addEventListener('click', ()=>{
         let ok = true;
         for(const en of Object.keys(selects)){
-          if(selects[en].value !== it.pairs[en]){ ok = false; break; }
+          if(selects[en].dataset.vi !== it.pairs[en]){ ok = false; break; }
         }
         const ans = Object.entries(it.pairs).map(([e,v])=>`${e}=${v}`).join(', ');
         showFeedback(ok, ans);

@@ -38,6 +38,7 @@ class ExerciseBuilder:
             "answer": word["word"],
             "pos": word.get("pos", ""),
             "audio_url": word.get("audio_url"),
+            "image_url": word.get("image_url"),
         }
 
     @staticmethod
@@ -48,6 +49,7 @@ class ExerciseBuilder:
             "prompt_vi": word.get("meaning_vi", "(no meaning)"),
             "pos": word.get("pos", ""),
             "audio_url": word.get("audio_url"),
+            "image_url": word.get("image_url"),
         }
 
     @staticmethod
