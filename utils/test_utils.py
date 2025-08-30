@@ -33,17 +33,24 @@ def finalize_session(session_id: str, results: dict):
         json.dump(sess, f, ensure_ascii=False, indent=2)
 
     data = load_cards()
+    ltm_thr = current_app.config.get("LTM_WRONG_UNDER", 2)
+    stm_thr = current_app.config.get("STM_WRONG_UNDER", 4)
     label_summary = {"LTM": 0, "STM": 0, "REVIEW": 0}
     for w in sess.get("picked_words", []):
         wrong = int(results.get(w, 0))
-        label = "LTM" if wrong == 0 else ("STM" if wrong == 1 else "REVIEW")
+        if wrong < ltm_thr:
+            label = "LTM"
+        elif wrong < stm_thr:
+            label = "STM"
+        else:
+            label = "REVIEW"
         label_summary[label] += 1
         for c in data["cards"]:
             if c["word"].lower() == w.lower():
                 c["memory_label"] = label
                 c["updated_at"] = _iso(_utcnow())
                 stats = c.get("stats") or {"correct": 0, "wrong": 0}
-                if wrong == 0:
+                if wrong < ltm_thr:
                     stats["correct"] = stats.get("correct", 0) + 1
                 else:
                     stats["wrong"] = stats.get("wrong", 0) + 1
@@ -73,7 +80,10 @@ def finalize_session(session_id: str, results: dict):
         "results": {
             w: {
                 "wrong": int(results.get(w, 0)),
-                "label": "LTM" if int(results.get(w, 0)) == 0 else ("STM" if int(results.get(w, 0)) == 1 else "REVIEW"),
+                "label": (
+                    "LTM" if int(results.get(w, 0)) < ltm_thr
+                    else ("STM" if int(results.get(w, 0)) < stm_thr else "REVIEW")
+                ),
             }
             for w in sess.get("picked_words", [])
         },

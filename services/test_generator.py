@@ -1,4 +1,5 @@
 import random
+import difflib
 from typing import List, Dict
 
 from services.llm_service import LLMClient
@@ -64,23 +65,22 @@ class ExerciseBuilder:
         }
 
     @staticmethod
-    def build_en_vi_match(word: Dict, all_words: List[Dict], llm: LLMClient):
-        similars = llm.generate_similar_or_confusables(word["word"]) if llm else []
+    def build_en_vi_match(word: Dict, all_words: List[Dict]):
+        lexicon = [c["word"] for c in all_words if c["word"].lower() != word["word"].lower()]
+        similars = difflib.get_close_matches(word["word"], lexicon, n=4, cutoff=0.5)
+        while len(similars) < 4 and lexicon:
+            cand = random.choice(lexicon)
+            if cand not in similars:
+                similars.append(cand)
         words = [word["word"]] + similars[:4]
         if len(words) < 5:
             return None
         pairs = []
-        for w in words:
-            card = next((c for c in all_words if c["word"].lower() == w.lower()), None)
+        for w_en in words:
+            card = next((c for c in all_words if c["word"].lower() == w_en.lower()), None)
             meaning = card.get("meaning_vi", "") if card else ""
             pos = card.get("pos", "") if card else ""
-            if (not meaning or not pos) and llm:
-                desc = llm.describe_word(w)
-                if not meaning:
-                    meaning = desc.get("meaning_vi", "")
-                if not pos:
-                    pos = desc.get("pos", "")
-            pairs.append({"en": w, "vi": meaning, "pos": pos})
+            pairs.append({"en": w_en, "vi": meaning, "pos": pos})
         en_words = [p["en"] for p in pairs]
         vi_meanings = [p["vi"] for p in pairs]
         pos_map = {p["en"]: p["pos"] for p in pairs}
@@ -96,7 +96,6 @@ class ExerciseBuilder:
             "pos_map": pos_map,
             "audio_url": word.get("audio_url"),
         }
-
     @staticmethod
     def build_audio_to_en(word: Dict) -> Dict:
         return {
@@ -124,7 +123,7 @@ class ExerciseBuilder:
             if "vi_sentence_input" in enabled:
                 items.append(ExerciseBuilder.build_vi_sentence_input(w, llm))
             if "en_vi_match" in enabled:
-                match = ExerciseBuilder.build_en_vi_match(w, all_words, llm)
+                match = ExerciseBuilder.build_en_vi_match(w, all_words)
                 if match:
                     items.append(match)
             if "audio2en_input" in enabled and w.get("audio_url"):

@@ -88,8 +88,9 @@ class LLMClient:
             }
 
         prompt = (
-            "Provide a short Vietnamese sentence that naturally uses or relates to the word's meaning "
-            "and its English translation. Respond only as JSON with keys vi and en. Word: " + word
+            "Create one Vietnamese sentence of around 15 words that can be translated into English in only one natural way. "
+            f"The English translation must include the word '{word}' exactly once. "
+            "Respond only as JSON with keys vi and en."
         )
         payload = {
             "model": self.model,

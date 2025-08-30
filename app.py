@@ -31,6 +31,8 @@ def create_app():
         ANSWER_REVEAL_MS=int(CONF.get("app", {}).get("answer_reveal_ms", 1200)),
         OPENAI_TTS_MODEL=CONF.get("openai", {}).get("tts_model", "gpt-4o-mini-tts"),
         ENABLED_EXERCISE_TYPES=CONF.get("app", {}).get("enabled_exercise_types", []),
+        LTM_WRONG_UNDER=int(CONF.get("app", {}).get("ltm_wrong_under", 2)),
+        STM_WRONG_UNDER=int(CONF.get("app", {}).get("stm_wrong_under", 4)),
     )
 
     # ---- Clients (LLM / Image) ----

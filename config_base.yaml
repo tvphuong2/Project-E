@@ -21,3 +21,5 @@ app:
     - vi_sentence_input
     - en_vi_match
     - audio2en_input
+  ltm_wrong_under: 2
+  stm_wrong_under: 4
