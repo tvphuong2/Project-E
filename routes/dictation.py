@@ -106,7 +106,7 @@ def lesson_start(id: str):
 def lesson_check(id: str):
     """
     Trong session đang chạy: tính WER và highlight tại chỗ (không lưu attempt).
-    Dùng LLM để chuẩn hoá HYP nếu có key; nếu không thì rule-based.
+    Chuẩn hoá văn bản theo luật (không dùng LLM) trước khi so sánh.
     """
     body = request.get_json(force=True)
     user_text = body.get("user_text", "")
@@ -126,13 +126,8 @@ def lesson_check(id: str):
     with open(meta, "r", encoding="utf-8") as f:
         obj = json.load(f)
 
-    llm = current_app.config["LLM_CLIENT"]
-    if current_app.config["OPENAI_KEY"]:
-        ref = normalize_for_scoring(llm.normalize_text(obj["text_original"]))
-        hyp = normalize_for_scoring(llm.normalize_text(user_text))
-    else:
-        ref = normalize_for_scoring(obj["text_original"])
-        hyp = normalize_for_scoring(user_text)
+    ref = normalize_for_scoring(obj.get("text_normalized") or obj.get("text_original", ""))
+    hyp = normalize_for_scoring(user_text)
 
     ref_toks = tokenize_words(ref)
     hyp_toks = tokenize_words(hyp)
@@ -168,7 +163,8 @@ def lesson_check(id: str):
 @bp.post("/lesson/<id>/finalize")
 def lesson_finalize(id: str):
     """
-    Kết thúc session: lưu attempt vào lesson.json và trả lại đáp án (ref normalized).
+    Kết thúc session: lưu attempt vào lesson.json và trả lại đáp án đã chuẩn hoá.
+    Việc chuẩn hoá chỉ dùng luật, không gọi LLM.
     """
     body = request.get_json(force=True)
     user_text = body.get("user_text", "")
@@ -184,13 +180,8 @@ def lesson_finalize(id: str):
     with open(meta, "r", encoding="utf-8") as f:
         obj = json.load(f)
 
-    llm = current_app.config["LLM_CLIENT"]
-    if current_app.config["OPENAI_KEY"]:
-        ref = normalize_for_scoring(llm.normalize_text(obj["text_original"]))
-        hyp = normalize_for_scoring(llm.normalize_text(user_text))
-    else:
-        ref = normalize_for_scoring(obj["text_original"])
-        hyp = normalize_for_scoring(user_text)
+    ref = normalize_for_scoring(obj.get("text_normalized") or obj.get("text_original", ""))
+    hyp = normalize_for_scoring(user_text)
 
     ref_toks = tokenize_words(ref)
     hyp_toks = tokenize_words(hyp)
