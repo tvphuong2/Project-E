@@ -1,8 +1,8 @@
 # routes\dictation.py
-import os, uuid, re, json
+import os, uuid, json
 from flask import Blueprint, current_app, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
-from services.alignment import tokenize_words, align_and_score, collapse_deletions_to_single_underscore
+from services.alignment import tokenize_words, align_and_score
 from services.text_normalizer import normalize_for_scoring
 from services.stats_service import SpeedCalculator, ProgressTracker
 from utils.timeutil import _utcnow, _iso
@@ -50,7 +50,10 @@ def create_lesson():
     audio.save(audio_path_fs)
 
     llm = current_app.config["LLM_CLIENT"]
-    ref_norm = llm.normalize_text(text) if current_app.config["OPENAI_KEY"] else normalize_for_scoring(text)
+    if current_app.config["OPENAI_KEY"]:
+        ref_norm = normalize_for_scoring(llm.normalize_text(text))
+    else:
+        ref_norm = normalize_for_scoring(text)
 
     obj = {
         "id": lid,
@@ -124,25 +127,28 @@ def lesson_check(id: str):
         obj = json.load(f)
 
     llm = current_app.config["LLM_CLIENT"]
-    hyp = llm.normalize_text(user_text) if current_app.config["OPENAI_KEY"] else normalize_for_scoring(user_text)
-    ref = obj["text_normalized"]
+    if current_app.config["OPENAI_KEY"]:
+        ref = normalize_for_scoring(llm.normalize_text(obj["text_original"]))
+        hyp = normalize_for_scoring(llm.normalize_text(user_text))
+    else:
+        ref = normalize_for_scoring(obj["text_original"])
+        hyp = normalize_for_scoring(user_text)
 
     ref_toks = tokenize_words(ref)
     hyp_toks = tokenize_words(hyp)
 
     ar = align_and_score(ref_toks, hyp_toks)
-    ops = collapse_deletions_to_single_underscore(ar.ops)
 
     spans = []
-    for op, rt, ht in ops:
-        if op == "_":
-            spans.append({"token": "_", "status": "missing"})
-        elif op == "M":
-            spans.append({"token": ht, "status": "correct"})
-        elif op in ("S", "I"):
-            spans.append({"token": ht if ht else rt, "status": "wrong"})
+    for op, rt, ht in ar.ops:
+        if op == "M":
+            spans.append({"token": ht, "status": "correct", "correct": ht})
+        elif op == "S":
+            spans.append({"token": ht, "status": "wrong", "correct": rt})
+        elif op == "I":
+            spans.append({"token": ht, "status": "wrong", "correct": ""})
         elif op == "D":
-            spans.append({"token": "_", "status": "missing"})
+            spans.append({"token": "_", "status": "missing", "correct": rt})
 
     correct = sum(1 for op, _, _ in ar.ops if op == "M")
     wrong = sum(1 for op, _, _ in ar.ops if op in ("S", "I"))
@@ -179,8 +185,12 @@ def lesson_finalize(id: str):
         obj = json.load(f)
 
     llm = current_app.config["LLM_CLIENT"]
-    ref = obj["text_normalized"]
-    hyp = llm.normalize_text(user_text) if current_app.config["OPENAI_KEY"] else normalize_for_scoring(user_text)
+    if current_app.config["OPENAI_KEY"]:
+        ref = normalize_for_scoring(llm.normalize_text(obj["text_original"]))
+        hyp = normalize_for_scoring(llm.normalize_text(user_text))
+    else:
+        ref = normalize_for_scoring(obj["text_original"])
+        hyp = normalize_for_scoring(user_text)
 
     ref_toks = tokenize_words(ref)
     hyp_toks = tokenize_words(hyp)

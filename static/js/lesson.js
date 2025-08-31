@@ -87,6 +87,9 @@ function renderResult(res){
     const el = document.createElement('span');
     el.className = 'hl ' + s.status;
     el.textContent = s.token;
+    if(s.correct !== undefined){
+      el.title = s.correct || '(thừa)';
+    }
     spans.appendChild(el);
     spans.appendChild(document.createTextNode(' '));
   });

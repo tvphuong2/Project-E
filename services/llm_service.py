@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List, Optional
 import requests
+from services.text_normalizer import normalize_for_scoring
 
 class LLMClient:
     def __init__(self, api_key: Optional[str]=None, model: str="gpt-4o-mini"):
@@ -23,16 +24,17 @@ class LLMClient:
         prompt = (
             "Normalize this English text for dictation comparison: "
             "expand contractions (I'm->I am, we've->we have, 'em->them, etc.), "
-            "spell out numbers in words, remove special symbols, keep only commas and periods, "
+            "spell out numbers in words, remove special symbols and punctuation, "
             "use lowercase, collapse whitespace. Return ONLY the normalized text."
             f"TEXT:{text}"
         )
         payload = {"model": self.model, "messages": [{"role":"user","content": prompt}], "temperature": 0}
         try:
             data = self._post(payload)
-            return data["choices"][0]["message"]["content"].strip()
+            content = data["choices"][0]["message"]["content"].strip()
+            return normalize_for_scoring(content)
         except Exception as e:
-            return text
+            return normalize_for_scoring(text)
 
     def describe_word(self, word: str) -> Dict:
         if not self.api_key:
