@@ -98,20 +98,21 @@ function diffWords(user, correct){
   const ops = alignTokens(ref, hyp);
   const disp = correct.trim().split(/\s+/);
   let di = 0;
-  let out = [];
+  const out = [];
+  const push = (cls, txt) => out.push(`<span class="${cls}">${txt}&nbsp;</span>`);
   for(const [op, rt, ht] of ops){
     const token = disp[di] || rt || ht;
     if(op==='M'){
-      out.push(`<span class="ok">${token}</span>`); di++;
+      push('ok', token); di++;
     }else if(op==='S'){
-      out.push(`<span class="wrong">${token}</span>`); di++;
+      push('wrong', token); di++;
     }else if(op==='I'){
-      out.push(`<span class="wrong">${ht}</span>`);
+      push('wrong', ht);
     }else if(op==='D'){
-      out.push(`<span class="miss">_${rt}</span>`); di++;
+      push('miss', '_' + rt); di++;
     }
   }
-  return out.join(' ');
+  return out.join('');
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{

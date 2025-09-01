@@ -7,7 +7,7 @@ from services.image_service import ImageFetcher
 from services.tts_service import TTSService
 from services.test_generator import WordSampler, ExerciseBuilder
 from utils.storage import load_cards, save_cards, ensure_card_ids
-from utils.test_utils import finalize_session
+from utils.session_utils import finalize_session
 from utils.timeutil import _utcnow, _iso
 
 bp = Blueprint("vocab_test", __name__)
