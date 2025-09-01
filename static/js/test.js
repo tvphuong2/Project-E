@@ -84,7 +84,7 @@ function diffChars(user, correct){
     }else if(op==='S'){
       out += `<span class="wrong">${ch}</span>`; di++;
     }else if(op==='I'){
-      out += `<span class="wrong">${ht}</span>`;
+      out += `<span class="wrong">_</span>`;
     }else if(op==='D'){
       out += `<span class="miss">_${rt}</span>`; di++;
     }
@@ -107,7 +107,7 @@ function diffWords(user, correct){
     }else if(op==='S'){
       push('wrong', token); di++;
     }else if(op==='I'){
-      push('wrong', ht);
+      push('wrong', '_');
     }else if(op==='D'){
       push('miss', '_' + rt); di++;
     }
