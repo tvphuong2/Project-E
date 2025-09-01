@@ -5,12 +5,16 @@ let queue = [];
 let nextRound = [];
 let wrongCounts = {};
 let currentItem = null;
-const REVEAL_MS = window.ANSWER_REVEAL_MS || 1200;
+const ANSWER_MS_MAP = window.ANSWER_MS_MAP || {};
 let audioPlayer = null;
 let hudRemain, hudTimer, cardArea;
 let startTime = 0;
 let timerInterval = null;
 let maxSec = (window.MAX_MIN || 30) * 60;
+
+function revealDelay(type){
+  return ANSWER_MS_MAP[type] || ANSWER_MS_MAP['default'] || 1200;
+}
 
 function normalizeSentence(s){
   return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
@@ -31,40 +35,80 @@ function wordEquals(user, correct, pos=''){
   return false;
 }
 
-function diffChars(user, correct){
-  const u = user.toLowerCase();
-  const c = correct.toLowerCase();
-  let res = '';
-  for(let i=0;i<correct.length;i++){
-    const uc = u[i];
-    const cc = c[i];
-    const disp = correct[i];
-    if(uc === cc){
-      res += `<span class="ok">${disp}</span>`;
-    }else if(typeof uc === 'undefined'){
-      res += `<span class="miss">_${disp}</span>`;
-    }else{
-      res += `<span class="wrong">${disp}</span>`;
+function alignTokens(ref, hyp){
+  const n = ref.length, m = hyp.length;
+  const dp = Array.from({length:n+1}, ()=>Array(m+1).fill(0));
+  const bt = Array.from({length:n+1}, ()=>Array(m+1).fill(null));
+  for(let i=1;i<=n;i++){ dp[i][0]=i; bt[i][0]='D'; }
+  for(let j=1;j<=m;j++){ dp[0][j]=j; bt[0][j]='I'; }
+  for(let i=1;i<=n;i++){
+    for(let j=1;j<=m;j++){
+      const cost = ref[i-1]===hyp[j-1]?0:1;
+      const choices = [
+        [dp[i-1][j-1]+cost, cost===0?'M':'S'],
+        [dp[i][j-1]+1, 'I'],
+        [dp[i-1][j]+1, 'D']
+      ];
+      let best = choices[0];
+      if(choices[1][0] < best[0]) best = choices[1];
+      if(choices[2][0] < best[0]) best = choices[2];
+      dp[i][j] = best[0];
+      bt[i][j] = best[1];
     }
   }
-  return res;
+  const ops=[];
+  let i=n,j=m;
+  while(i>0 || j>0){
+    const op = bt[i][j];
+    if(op==='M'){ ops.push(['M', ref[i-1], hyp[j-1]]); i--; j--; }
+    else if(op==='S'){ ops.push(['S', ref[i-1], hyp[j-1]]); i--; j--; }
+    else if(op==='I'){ ops.push(['I', '', hyp[j-1]]); j--; }
+    else if(op==='D'){ ops.push(['D', ref[i-1], '']); i--; }
+    else break;
+  }
+  ops.reverse();
+  return ops;
+}
+
+function diffChars(user, correct){
+  const ref = correct.toLowerCase().split('');
+  const hyp = user.toLowerCase().split('');
+  const ops = alignTokens(ref, hyp);
+  const disp = correct.split('');
+  let di = 0;
+  let out = '';
+  for(const [op, rt, ht] of ops){
+    const ch = disp[di] || rt || ht;
+    if(op==='M'){
+      out += `<span class="ok">${ch}</span>`; di++;
+    }else if(op==='S'){
+      out += `<span class="wrong">${ch}</span>`; di++;
+    }else if(op==='I'){
+      out += `<span class="wrong">${ht}</span>`;
+    }else if(op==='D'){
+      out += `<span class="miss">_${rt}</span>`; di++;
+    }
+  }
+  return out;
 }
 
 function diffWords(user, correct){
-  const u = normalizeSentence(user).split(/\s+/);
-  const cClean = normalizeSentence(correct).split(/\s+/);
-  const cDisp = correct.trim().split(/\s+/);
+  const ref = normalizeSentence(correct).split(/\s+/);
+  const hyp = normalizeSentence(user).split(/\s+/);
+  const ops = alignTokens(ref, hyp);
+  const disp = correct.trim().split(/\s+/);
+  let di = 0;
   let out = [];
-  for(let i=0;i<cClean.length;i++){
-    const uw = u[i];
-    const cw = cClean[i];
-    const disp = cDisp[i];
-    if(uw === cw){
-      out.push(`<span class="ok">${disp}</span>`);
-    }else if(typeof uw === 'undefined'){
-      out.push(`<span class="miss">_${disp}</span>`);
-    }else{
-      out.push(`<span class="wrong">${disp}</span>`);
+  for(const [op, rt, ht] of ops){
+    const token = disp[di] || rt || ht;
+    if(op==='M'){
+      out.push(`<span class="ok">${token}</span>`); di++;
+    }else if(op==='S'){
+      out.push(`<span class="wrong">${token}</span>`); di++;
+    }else if(op==='I'){
+      out.push(`<span class="wrong">${ht}</span>`);
+    }else if(op==='D'){
+      out.push(`<span class="miss">_${rt}</span>`); di++;
     }
   }
   return out.join(' ');
@@ -269,7 +313,11 @@ function showFeedback(correct, answer, userInput=''){
     let ansHTML = answer;
     if(currentItem.type === 'vi_sentence_input'){
       ansHTML = diffWords(userInput, answer);
-    }else if(currentItem.type === 'type_from_meaning'){
+    }else if(
+      currentItem.type === 'type_from_meaning' ||
+      currentItem.type === 'audio2en_input' ||
+      currentItem.type === 'vi2en_mcq'
+    ){
       ansHTML = diffChars(userInput, answer);
     }
     fb.innerHTML = `<div class="wrong">Sai</div><div class="fb-ans">${ansHTML}</div>`;
@@ -280,7 +328,7 @@ function showFeedback(correct, answer, userInput=''){
     audioPlayer = new Audio(currentItem.audio_url);
     audioPlayer.play().catch(()=>{});
   }
-  setTimeout(showNext, REVEAL_MS);
+  setTimeout(showNext, revealDelay(currentItem.type));
 }
 
 async function finalize(){

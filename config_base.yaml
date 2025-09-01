@@ -14,7 +14,13 @@ app:
   port: 5000
   debug: true
   test_word_count: 10
-  answer_reveal_ms: 1200
+  answer_reveal_ms:
+    default: 1200
+    vi_sentence_input: 1500
+    type_from_meaning: 1200
+    vi2en_mcq: 1000
+    en_vi_match: 1500
+    audio2en_input: 1200
   enabled_exercise_types:
     - vi2en_mcq
     - type_from_meaning

@@ -9,7 +9,7 @@
   <div id="cardArea"></div>
 </div>
 <script>
-  window.ANSWER_REVEAL_MS = {{ answer_ms }};
+  window.ANSWER_MS_MAP = {{ answer_ms_map|tojson }};
   window.MAX_MIN = {{ max_min }};
 </script>
 <script type="module" src="{{ url_for('static', filename='js/test.js') }}"></script>

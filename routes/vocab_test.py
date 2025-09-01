@@ -279,9 +279,9 @@ def vocab_fill_missing_all():
 def get_test_page():
     "Trang bắt đầu bài test ôn từ (templates/test.html)."
     k = current_app.config.get("TEST_WORD_COUNT", 10)
-    ans = current_app.config.get("ANSWER_REVEAL_MS", 1200)
+    ans_map = current_app.config.get("ANSWER_REVEAL_MS", {})
     max_min = current_app.config.get("MAX_MIN", 30)
-    return render_template("test.html", title="Test từ vựng", test_word_count=k, answer_ms=ans, max_min=max_min)
+    return render_template("test.html", title="Test từ vựng", test_word_count=k, answer_ms_map=ans_map, max_min=max_min)
 
 @bp.post("/tests/start")
 def start_tests():

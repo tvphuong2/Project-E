@@ -14,6 +14,12 @@ def create_app():
 
     app = Flask(__name__)
 
+    ans_conf = CONF.get("app", {}).get("answer_reveal_ms", {})
+    if isinstance(ans_conf, dict):
+        ans_map = {k: int(v) for k, v in ans_conf.items()}
+    else:
+        ans_map = {"default": int(ans_conf or 1200)}
+
     # ---- App config (đường dẫn & tham số) ----
     app.config.update(
         BASE_DIR=BASE,
@@ -28,7 +34,7 @@ def create_app():
         G_CSE_CX=CONF.get("google_cse", {}).get("cx"),
         MAX_MIN=int(CONF.get("app", {}).get("max_attempt_duration_min", 30)),
         TEST_WORD_COUNT=int(CONF.get("app", {}).get("test_word_count", 10)),
-        ANSWER_REVEAL_MS=int(CONF.get("app", {}).get("answer_reveal_ms", 1200)),
+        ANSWER_REVEAL_MS=ans_map,
         OPENAI_TTS_MODEL=CONF.get("openai", {}).get("tts_model", "gpt-4o-mini-tts"),
         ENABLED_EXERCISE_TYPES=CONF.get("app", {}).get("enabled_exercise_types", []),
         LTM_WRONG_UNDER=int(CONF.get("app", {}).get("ltm_wrong_under", 2)),
