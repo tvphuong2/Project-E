@@ -19,6 +19,7 @@ textarea { min-height: 180px; }
 table { width: 100%; border-collapse: collapse; }
 td, th { border-bottom: 1px solid #222; padding: 8px; text-align: left; }
 audio { width: 100%; }
+video { width: 100%; max-height: 50vh; }
 small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; opacity: .7; }
 .hidden { display: none !important; }
 .fullscreen {

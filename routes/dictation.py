@@ -36,18 +36,18 @@ def create_lesson():
       - Redirect sang trang lesson/<id>
     """
     title = request.form.get("title", "Untitled").strip() or "Untitled"
-    audio = request.files.get("audio")
+    media = request.files.get("media")
     text = request.form.get("text", "")
-    if not (audio and text):
-        return "Missing audio or text", 400
+    if not (media and text):
+        return "Missing media or text", 400
 
     lid = str(uuid.uuid4())
     ldir = os.path.join(current_app.config["LESSON_DIR"], lid)
     os.makedirs(ldir, exist_ok=True)
 
-    safe_name = secure_filename(audio.filename) or f"audio_{lid}.mp3"
-    audio_path_fs = os.path.join(ldir, safe_name)
-    audio.save(audio_path_fs)
+    safe_name = secure_filename(media.filename) or f"media_{lid}"
+    media_path_fs = os.path.join(ldir, safe_name)
+    media.save(media_path_fs)
 
     llm = current_app.config["LLM_CLIENT"]
     if current_app.config["OPENAI_KEY"]:
@@ -55,10 +55,12 @@ def create_lesson():
     else:
         ref_norm = normalize_for_scoring(text)
 
+    rel_path = os.path.relpath(media_path_fs, current_app.config["BASE_DIR"]).replace("\\", "/")
+    field = "video_path" if media.mimetype.startswith("video") else "audio_path"
     obj = {
         "id": lid,
         "title": title,
-        "audio_path": os.path.relpath(audio_path_fs, current_app.config["BASE_DIR"]).replace("\\", "/"),
+        field: rel_path,
         "text_original": text,
         "text_normalized": ref_norm,
         "n_ref_words": len(tokenize_words(ref_norm)),

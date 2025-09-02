@@ -2,7 +2,11 @@
 {% block content %}
 <div class="card">
   <h3>{{ lesson.title }}</h3>
-  <audio id="audio" controls src="/{{ lesson.audio_path }}"></audio>
+  {% if lesson.video_path %}
+  <video id="media" controls src="/{{ lesson.video_path }}" style="max-height:50vh;width:100%;"></video>
+  {% else %}
+  <audio id="media" controls src="/{{ lesson.audio_path }}"></audio>
+  {% endif %}
   <div><b>Thời gian còn lại:</b> <span id="countdown">30:00</span></div>
 </div>
 

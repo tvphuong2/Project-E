@@ -6,8 +6,8 @@
     <form action="/lessons/create" method="post" enctype="multipart/form-data">
       <label>Tiêu đề</label>
       <input name="title" required>
-      <label>Audio (mp3/wav)</label>
-      <input type="file" name="audio" accept="audio/*" required>
+      <label>Media (audio/video)</label>
+      <input type="file" name="media" accept="audio/*,video/*" required>
       <label>Text (nội dung gốc)</label>
       <textarea name="text" placeholder="Dán transcript gốc tại đây..." required></textarea>
       <button class="btn" type="submit">Tạo bài</button>
