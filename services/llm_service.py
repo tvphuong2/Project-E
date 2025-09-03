@@ -41,10 +41,10 @@ class LLMClient:
             return {"pos": "", "meaning_vi": "", "usage": "", "phonetic": ""}
 
         prompt = (
-            "For the English vocabulary word below, return a compact JSON object ONLY with keys: "
-            "pos (part of speech), meaning_vi (Vietnamese explanation describing how the word is used, not just a short translation), "
+            "For the English word or phrase below, return a compact JSON object ONLY with keys: "
+            "pos (part of speech), meaning_vi (Vietnamese explanation describing how the term is used, not just a short translation), "
             "usage (1 short example sentence showing context), phonetic (IPA). "
-            "Do not include any commentary. Word: " + word
+            "Do not include any commentary. Term: " + word
         )
 
         payload = {
@@ -71,7 +71,7 @@ class LLMClient:
         if not self.api_key:
             return []
         prompt = (
-            "List 3-6 English words that are commonly confused with or sound similar to: "
+            "List 3-6 English words or phrases that are commonly confused with or sound similar to: "
             f"{word}. Respond as a comma-separated list only."
         )
         payload = {"model": self.model, "messages":[{"role":"user","content":prompt}], "temperature":0.4}
@@ -82,7 +82,7 @@ class LLMClient:
         return [p for p in parts if p and p.lower()!=word.lower()][:6]
 
     def generate_sentence_pair(self, word: str) -> Dict[str, str]:
-        """Sinh 1 câu tiếng Việt và bản dịch tiếng Anh cho từ đang xét."""
+        """Sinh 1 câu tiếng Việt và bản dịch tiếng Anh cho từ hoặc cụm từ."""
         if not self.api_key:
             return {
                 "vi": f"Tôi đang học từ '{word}'",
@@ -91,7 +91,7 @@ class LLMClient:
 
         prompt = (
             "Create one Vietnamese sentence of around 15 words that can be translated into English in only one natural way. "
-            f"The English translation must include the word '{word}' exactly once. "
+            f"The English translation must include the word or phrase '{word}' exactly once. "
             "Respond only as JSON with keys vi and en."
         )
         payload = {

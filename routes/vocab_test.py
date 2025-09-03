@@ -1,6 +1,7 @@
 # routes\vocab_test.py
 import uuid, re
 import os
+from string import capwords
 from flask import Blueprint, current_app, render_template, request, jsonify
 from services.llm_service import LLMClient
 from services.image_service import ImageFetcher
@@ -52,9 +53,9 @@ def vocab_card_detail(id_or_word):
 @bp.post("/vocab/save_selection")
 def vocab_save_selection():
     """
-    Lưu một từ mới từ phần bôi đen:
-      - Chuẩn hoá token (loại bỏ 's, lấy token chữ dài nhất, giữ gạch nối)
-      - Tránh trùng (case-insensitive)
+    Lưu một từ hoặc cụm từ mới từ phần bôi đen:
+      - Chuẩn hoá: bỏ 's, ký tự lạ, chỉ giữ chữ cái/ dấu gạch nối và khoảng trắng
+      - Tránh trùng (không phân biệt hoa/thường)
       - Tùy chọn enrich ngay nếu payload.enrich_now = true
     """
     ensure_card_ids()
@@ -70,10 +71,10 @@ def vocab_save_selection():
         import re as _re
         tokens = _re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)*", t)
         if not tokens: return ""
-        return max(tokens, key=len).lower().strip("-")
+        return " ".join(tokens).lower()
 
     word = canonicalize(raw)
-    if not word or len(word) < 2 or len(word) > 40:
+    if not word or len(word) < 2 or len(word) > 80:
         return jsonify({"ok": False, "error": "invalid_word", "input": raw, "normalized": word}), 400
 
     data = load_cards()
@@ -84,7 +85,7 @@ def vocab_save_selection():
 
     now = _iso(_utcnow())
     card = {
-        "id": str(uuid.uuid4()), "word": word.capitalize(),
+        "id": str(uuid.uuid4()), "word": capwords(word),
         "status": "raw", "origin": "manual",
         "pos": "", "meaning_vi": "", "usage": "", "phonetic": "",
         "image_url": None,
@@ -134,7 +135,7 @@ def vocab_enrich_all():
         if (c.get("status") or "").lower() == "raw":
             desc = llm.describe_word(c["word"]) if current_app.config["OPENAI_KEY"] else {"pos":"", "meaning_vi":"", "usage":"", "phonetic":""}
             c.update({
-                "word": c.get("word","").capitalize(),
+                "word": capwords(c.get("word","")),
                 "pos": desc.get("pos",""),
                 "meaning_vi": desc.get("meaning_vi",""),
                 "usage": desc.get("usage",""),
@@ -161,7 +162,7 @@ def vocab_enrich_all():
                         if tts.synthesize(s, aud_path2):
                             audio_url = f"/data/cards/audio/{new_id}.mp3"
                     data["cards"].append({
-                        "id": new_id, "word": s.capitalize(),
+                        "id": new_id, "word": capwords(s),
                         "status": "additional", "origin": "auto_additional",
                         "pos": desc2.get("pos",""), "meaning_vi": desc2.get("meaning_vi",""),
                         "usage": desc2.get("usage",""), "phonetic": desc2.get("phonetic",""),

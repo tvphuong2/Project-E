@@ -122,7 +122,6 @@ async function onSaveWord(){
   const start = ta.selectionStart, end = ta.selectionEnd;
   const selected = ta.value.slice(start, end).trim();
   if(!selected){ alert('Hãy bôi đen một từ trong vùng nhập.'); return; }
-  const word = selected.split(/\s+/)[0];
-  const res = await postJSON('/vocab/save_selection', { word });
+  const res = await postJSON('/vocab/save_selection', { text: selected });
   alert(res.message || 'Đã lưu từ');
 }
