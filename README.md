@@ -24,7 +24,7 @@ python app.py
 - Type transcript, press **Kiểm tra (WER)** → shows WER, S/D/I, speed, improvement and highlights (green=correct, red=wrong, `_`=missing run).
 - Select a word in the textarea → **Lưu từ đã bôi đen** → adds a RAW card.
 - **Ôn từ mới**: see counts; **Enrich All** → describe words (LLM), fetch 1 image per word (Google CSE), auto-generate "additional" confusing words.
-- **Test** (very basic demo): pick 10 words (5/30/65 across memory buckets), generate MCQ (vi→en) and type-from-meaning; retake-wrong-only UX is stubbed; finalize marks words as LTM (demo).
+- **Test** (very basic demo): pick 10 words (ratios across memory buckets are configurable), generate MCQ (vi→en) and type-from-meaning; retake-wrong-only UX is stubbed; finalize marks words as LTM (demo).
 
 > You can extend /tests logic to track per-item correctness and apply exact LTM/STM/REVIEW rules.
 

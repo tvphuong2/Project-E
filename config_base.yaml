@@ -29,3 +29,7 @@ app:
     - audio2en_input
   ltm_wrong_under: 2
   stm_wrong_under: 4
+  memory_mix:
+    ltm: 0.05
+    stm: 0.30
+    review: 0.65

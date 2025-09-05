@@ -286,10 +286,11 @@ def get_test_page():
 
 @bp.post("/tests/start")
 def start_tests():
-    "Chọn số từ theo tỉ lệ 5/30/65, sinh bài tập."
+    "Chọn số từ theo tỉ lệ cấu hình, sinh bài tập."
     data = load_cards()
     k = current_app.config.get("TEST_WORD_COUNT", 10)
-    picked = WordSampler.sample_for_test(data["cards"], k=k)
+    mix = current_app.config.get("MEMORY_MIX", {})
+    picked = WordSampler.sample_for_test(data["cards"], k=k, mix=mix)
     llm: LLMClient = current_app.config.get("LLM_CLIENT")
     enabled = current_app.config.get("ENABLED_EXERCISE_TYPES") or []
     items = ExerciseBuilder.build_for_words(picked, data["cards"], llm, enabled)

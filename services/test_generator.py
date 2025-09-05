@@ -1,19 +1,26 @@
 import random
 import difflib
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from services.llm_service import LLMClient
 
 class WordSampler:
     @staticmethod
-    def sample_for_test(cards: List[Dict], k: int = 10) -> List[Dict]:
+    def sample_for_test(cards: List[Dict], k: int = 10, mix: Optional[Dict[str, float]] = None) -> List[Dict]:
         # Split by memory_label
         LTM = [c for c in cards if c.get("memory_label") == "LTM"]
         STM = [c for c in cards if c.get("memory_label") == "STM"]
         REV = [c for c in cards if c.get("memory_label") in (None, "", "REVIEW")]
-        # quotas 5%, 30%, 65% of k
-        q_ltm = max(0, round(0.05 * k))
-        q_stm = max(0, round(0.30 * k))
+        mix = mix or {}
+        p_ltm = float(mix.get("ltm", 0.05))
+        p_stm = float(mix.get("stm", 0.30))
+        p_rev = float(mix.get("review", 0.65))
+        total = p_ltm + p_stm + p_rev
+        if total > 0:
+            p_ltm /= total
+            p_stm /= total
+        q_ltm = max(0, round(p_ltm * k))
+        q_stm = max(0, round(p_stm * k))
         q_rev = k - q_ltm - q_stm
         pick = []
         random.shuffle(LTM); random.shuffle(STM); random.shuffle(REV)

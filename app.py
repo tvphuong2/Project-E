@@ -20,6 +20,12 @@ def create_app():
     else:
         ans_map = {"default": int(ans_conf or 1200)}
 
+    mix_conf = CONF.get("app", {}).get("memory_mix", {})
+    if isinstance(mix_conf, dict):
+        memory_mix = {k: float(v) for k, v in mix_conf.items()}
+    else:
+        memory_mix = {"ltm": 0.05, "stm": 0.30, "review": 0.65}
+
     # ---- App config (đường dẫn & tham số) ----
     app.config.update(
         BASE_DIR=BASE,
@@ -39,6 +45,7 @@ def create_app():
         ENABLED_EXERCISE_TYPES=CONF.get("app", {}).get("enabled_exercise_types", []),
         LTM_WRONG_UNDER=int(CONF.get("app", {}).get("ltm_wrong_under", 2)),
         STM_WRONG_UNDER=int(CONF.get("app", {}).get("stm_wrong_under", 4)),
+        MEMORY_MIX=memory_mix,
     )
 
     # ---- Clients (LLM / Image) ----
