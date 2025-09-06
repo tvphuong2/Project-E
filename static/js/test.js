@@ -233,6 +233,7 @@ function renderItem(it, box){
         const row = document.createElement('div');
         row.className = 'flex match-row';
         const sp = document.createElement('div');
+        sp.className = 'enword';
         sp.textContent = en + (it.pos_map && it.pos_map[en] ? ` (${it.pos_map[en]})` : '');
         row.appendChild(sp);
         const dz = document.createElement('div');
@@ -241,9 +242,12 @@ function renderItem(it, box){
         dz.addEventListener('dragover', e=>e.preventDefault());
         dz.addEventListener('drop', e=>{
           e.preventDefault();
-          const vi = e.dataTransfer.getData('text/plain');
-          dz.textContent = vi;
-          dz.dataset.vi = vi;
+          const id = e.dataTransfer.getData('text/plain');
+          const el = document.getElementById(id);
+          if(!el) return;
+          if(dz.firstChild) pool.appendChild(dz.firstChild);
+          dz.appendChild(el);
+          dz.dataset.vi = el.textContent;
         });
         row.appendChild(dz);
         rows.appendChild(row);
@@ -252,13 +256,29 @@ function renderItem(it, box){
       wrap.appendChild(rows);
       const pool = document.createElement('div');
       pool.className = 'vi-pool';
-      it.vi_meanings.forEach(v=>{
+      pool.addEventListener('dragover', e=>e.preventDefault());
+      pool.addEventListener('drop', e=>{
+        e.preventDefault();
+        const id = e.dataTransfer.getData('text/plain');
+        const el = document.getElementById(id);
+        if(el) {
+          if(el.parentElement.classList.contains('dropzone')){
+            el.parentElement.dataset.vi = '';
+          }
+          pool.appendChild(el);
+        }
+      });
+      it.vi_meanings.forEach((v,idx)=>{
         const d = document.createElement('div');
         d.className = 'drag-item';
         d.textContent = v;
         d.draggable = true;
+        d.id = `vi_${idx}`;
         d.addEventListener('dragstart', e=>{
-          e.dataTransfer.setData('text/plain', v);
+          e.dataTransfer.setData('text/plain', d.id);
+          if(d.parentElement.classList.contains('dropzone')){
+            d.parentElement.dataset.vi = '';
+          }
         });
         pool.appendChild(d);
       });
@@ -267,11 +287,23 @@ function renderItem(it, box){
       btn.className = 'btn secondary';
       btn.textContent = 'Kiểm tra';
       btn.addEventListener('click', ()=>{
+        const colors = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#46f0f0','#f032e6','#bcf60c','#fabebe'];
         let ok = true;
+        let i = 0;
         for(const en of Object.keys(selects)){
-          if(selects[en].dataset.vi !== it.pairs[en]){ ok = false; break; }
+          const dz = selects[en];
+          const color = colors[i % colors.length];
+          const enSpan = dz.parentElement.querySelector('.enword');
+          enSpan.style.color = color;
+          if(dz.firstChild) dz.firstChild.style.color = color;
+          if(dz.dataset.vi !== it.pairs[en]){ ok = false; dz.classList.add('wrong'); }
+          else dz.classList.remove('wrong');
+          i++;
         }
-        const ans = Object.entries(it.pairs).map(([e,v])=>`${e}=${v}`).join(', ');
+        const ans = Object.entries(it.pairs).map(([e,v],idx)=>{
+          const c = colors[idx % colors.length];
+          return `<span style="color:${c}">${e}</span> - <span style="color:${c}">${v}</span>`;
+        }).join('<br>');
         showFeedback(ok, ans);
       });
       wrap.appendChild(btn);
