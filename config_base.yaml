@@ -2,6 +2,7 @@
 openai:
   api_key: "..."
   model: "..."   # or any model you prefer
+  tts_model: "gpt-4o-mini-tts"
 
 google_cse:
   api_key: "..."
@@ -12,3 +13,23 @@ app:
   host: "127.0.0.1"
   port: 5000
   debug: true
+  test_word_count: 10
+  answer_reveal_ms:
+    default: 1200
+    vi_sentence_input: 1500
+    type_from_meaning: 1200
+    vi2en_mcq: 1000
+    en_vi_match: 1500
+    audio2en_input: 1200
+  enabled_exercise_types:
+    - vi2en_mcq
+    - type_from_meaning
+    - vi_sentence_input
+    - en_vi_match
+    - audio2en_input
+  ltm_wrong_under: 2
+  stm_wrong_under: 4
+  memory_mix:
+    ltm: 0.05
+    stm: 0.30
+    review: 0.65

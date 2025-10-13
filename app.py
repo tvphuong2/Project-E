@@ -2,6 +2,7 @@ import os, json, uuid, yaml
 from flask import Flask, send_from_directory
 from services.llm_service import LLMClient
 from services.image_service import ImageFetcher
+from services.tts_service import TTSService
 
 def create_app():
     BASE = os.path.dirname(__file__)
@@ -12,6 +13,18 @@ def create_app():
             CONF = yaml.safe_load(f) or {}
 
     app = Flask(__name__)
+
+    ans_conf = CONF.get("app", {}).get("answer_reveal_ms", {})
+    if isinstance(ans_conf, dict):
+        ans_map = {k: int(v) for k, v in ans_conf.items()}
+    else:
+        ans_map = {"default": int(ans_conf or 1200)}
+
+    mix_conf = CONF.get("app", {}).get("memory_mix", {})
+    if isinstance(mix_conf, dict):
+        memory_mix = {k: float(v) for k, v in mix_conf.items()}
+    else:
+        memory_mix = {"ltm": 0.05, "stm": 0.30, "review": 0.65}
 
     # ---- App config (đường dẫn & tham số) ----
     app.config.update(
@@ -26,6 +39,13 @@ def create_app():
         G_CSE_KEY=CONF.get("google_cse", {}).get("api_key"),
         G_CSE_CX=CONF.get("google_cse", {}).get("cx"),
         MAX_MIN=int(CONF.get("app", {}).get("max_attempt_duration_min", 30)),
+        TEST_WORD_COUNT=int(CONF.get("app", {}).get("test_word_count", 10)),
+        ANSWER_REVEAL_MS=ans_map,
+        OPENAI_TTS_MODEL=CONF.get("openai", {}).get("tts_model", "gpt-4o-mini-tts"),
+        ENABLED_EXERCISE_TYPES=CONF.get("app", {}).get("enabled_exercise_types", []),
+        LTM_WRONG_UNDER=int(CONF.get("app", {}).get("ltm_wrong_under", 2)),
+        STM_WRONG_UNDER=int(CONF.get("app", {}).get("stm_wrong_under", 4)),
+        MEMORY_MIX=memory_mix,
     )
 
     # ---- Clients (LLM / Image) ----
@@ -36,6 +56,10 @@ def create_app():
     app.config["IMG_FETCHER"] = ImageFetcher(
         api_key=app.config["G_CSE_KEY"],
         cx=app.config["G_CSE_CX"]
+    )
+    app.config["TTS_CLIENT"] = TTSService(
+        api_key=app.config["OPENAI_KEY"],
+        model=app.config["OPENAI_TTS_MODEL"]
     )
 
     # ---- Active session store (in-memory) ----

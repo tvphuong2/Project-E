@@ -14,6 +14,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 /** ======== UI Bindings ======== */
 function bindUI(){
+  $('#btnFillAll').addEventListener('click', onFillAll);
   $('#btnEnrichAll').addEventListener('click', onEnrichAll);
   $('#btnRefresh').addEventListener('click', async ()=>{ await loadSummary(); applyFiltersAndRender(); });
 
@@ -130,10 +131,12 @@ async function showDetail(id, scrollIntoView){
     <div style="margin:8px 0;">
       <img src="${c.image_url}" alt="${c.word}" style="max-width:100%; border-radius:10px;">
     </div>` : '';
+  const audio = c.audio_url ? `<div style="margin:8px 0;"><audio controls src="${c.audio_url}"></audio></div>` : '';
 
   $('#detailBody').innerHTML = `
     <div style="font-size:22px; font-weight:700;">${c.word || ''}</div>
     ${img}
+    ${audio}
     <div style="margin-top:6px;"><b>Phonetic:</b> ${c.phonetic || '—'}</div>
     <div><b>POS:</b> ${c.pos || '—'}</div>
     <div><b>Nghĩa (VI):</b> ${c.meaning_vi || '—'}</div>
@@ -141,14 +144,39 @@ async function showDetail(id, scrollIntoView){
     <div class="small mono" style="margin-top:8px;">
       Status: ${c.status || '—'} · Origin: ${c.origin || '—'} · Memory: ${c.memory_label || '—'}
     </div>
+    <div style="margin-top:8px;"><button class="btn" id="btnFillMissing">Bổ sung thông tin</button></div>
   `;
 
   if(scrollIntoView){
     document.getElementById('detailPanel').scrollIntoView({behavior:'smooth', block:'start'});
   }
+
+  $('#btnFillMissing').addEventListener('click', async ()=>{
+    const res = await postJSON('/vocab/fill_missing/' + c.id, {});
+    await loadSummary();
+    applyFiltersAndRender();
+    showDetail(res.card.id, false);
+  });
 }
 
 /** ======== Actions ======== */
+async function onFillAll(){
+  const btn = $('#btnFillAll');
+  btn.disabled = true;
+  btn.textContent = 'Đang bổ sung...';
+  try{
+    const res = await postJSON('/vocab/fill_missing_all', {});
+    alert(res.message || 'Đã bổ sung xong');
+    await loadSummary();
+    applyFiltersAndRender();
+  }catch(e){
+    alert('Lỗi bổ sung: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Bổ sung tất cả';
+  }
+}
+
 async function onEnrichAll(){
   const btn = $('#btnEnrichAll');
   btn.disabled = true;

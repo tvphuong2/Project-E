@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List, Optional
 import requests
+from services.text_normalizer import normalize_for_scoring
 
 class LLMClient:
     def __init__(self, api_key: Optional[str]=None, model: str="gpt-4o-mini"):
@@ -23,25 +24,27 @@ class LLMClient:
         prompt = (
             "Normalize this English text for dictation comparison: "
             "expand contractions (I'm->I am, we've->we have, 'em->them, etc.), "
-            "spell out numbers in words, remove special symbols, keep only commas and periods, "
+            "spell out numbers in words, remove special symbols and punctuation, "
             "use lowercase, collapse whitespace. Return ONLY the normalized text."
             f"TEXT:{text}"
         )
         payload = {"model": self.model, "messages": [{"role":"user","content": prompt}], "temperature": 0}
         try:
             data = self._post(payload)
-            return data["choices"][0]["message"]["content"].strip()
+            content = data["choices"][0]["message"]["content"].strip()
+            return normalize_for_scoring(content)
         except Exception as e:
-            return text
+            return normalize_for_scoring(text)
 
     def describe_word(self, word: str) -> Dict:
         if not self.api_key:
             return {"pos": "", "meaning_vi": "", "usage": "", "phonetic": ""}
 
         prompt = (
-            "For the English vocabulary word below, return a compact JSON object ONLY with keys: "
-            "pos (part of speech), meaning_vi (Vietnamese meaning), usage (1 short example sentence), phonetic (IPA). "
-            "Do not include any commentary. Word: " + word
+            "For the English word or phrase below, return a compact JSON object ONLY with keys: "
+            "pos (part of speech), meaning_vi (Vietnamese explanation describing how the term is used, not just a short translation), "
+            "usage (1 short example sentence showing context), phonetic (IPA). "
+            "Do not include any commentary. Term: " + word
         )
 
         payload = {
@@ -68,7 +71,7 @@ class LLMClient:
         if not self.api_key:
             return []
         prompt = (
-            "List 3-6 English words that are commonly confused with or sound similar to: "
+            "List 3-6 English words or phrases that are commonly confused with or sound similar to: "
             f"{word}. Respond as a comma-separated list only."
         )
         payload = {"model": self.model, "messages":[{"role":"user","content":prompt}], "temperature":0.4}
@@ -77,3 +80,34 @@ class LLMClient:
         content = data["choices"][0]["message"]["content"].strip()
         parts = [p.strip().strip(",.") for p in content.split(",")]
         return [p for p in parts if p and p.lower()!=word.lower()][:6]
+
+    def generate_sentence_pair(self, word: str) -> Dict[str, str]:
+        """Sinh 1 câu tiếng Việt và bản dịch tiếng Anh cho từ hoặc cụm từ."""
+        if not self.api_key:
+            return {
+                "vi": f"Tôi đang học từ '{word}'",
+                "en": f"I am learning the word '{word}'"
+            }
+
+        prompt = (
+            "Create one Vietnamese sentence of around 15 words that can be translated into English in only one natural way. "
+            f"The English translation must include the word or phrase '{word}' exactly once. "
+            "Respond only as JSON with keys vi and en."
+        )
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "response_format": {"type": "json_object"}
+        }
+        try:
+            data = self._post(payload)
+            content = data["choices"][0]["message"]["content"].strip()
+            import json as _json
+            obj = _json.loads(content)
+            return {"vi": obj.get("vi", ""), "en": obj.get("en", "")}
+        except Exception:
+            return {
+                "vi": f"Tôi đang học từ '{word}'",
+                "en": f"I am learning the word '{word}'"
+            }

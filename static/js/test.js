@@ -1,89 +1,402 @@
-import { postJSON, $, $all } from './common.js';
+import { postJSON, $ } from './common.js';
 
 let session = null;
-let wrongIndices = new Set();
-let phase = 'main'; // 'main' or 'retake'
+let queue = [];
+let nextRound = [];
+let wrongCounts = {};
+let currentItem = null;
+const ANSWER_MS_MAP = window.ANSWER_MS_MAP || {};
+let audioPlayer = null;
+let hudRemain, hudTimer, cardArea;
+let startTime = 0;
+let timerInterval = null;
+let maxSec = (window.MAX_MIN || 30) * 60;
 
-window.addEventListener('DOMContentLoaded', async ()=>{
+function revealDelay(type){
+  return ANSWER_MS_MAP[type] || ANSWER_MS_MAP['default'] || 1200;
+}
+
+function normalizeSentence(s){
+  return s.toLowerCase().replace(/[.,!?]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function normalizeWord(w){
+  return w.toLowerCase().replace(/[.,!?]/g,'').trim();
+}
+
+function wordEquals(user, correct, pos=''){
+  const u = normalizeWord(user);
+  const c = normalizeWord(correct);
+  if(u === c) return true;
+  const p = (pos || '').toLowerCase();
+  if(p.startsWith('n') || p.startsWith('v')){
+    if(u + 's' === c || u === c + 's') return true;
+  }
+  return false;
+}
+
+function alignTokens(ref, hyp){
+  const n = ref.length, m = hyp.length;
+  const dp = Array.from({length:n+1}, ()=>Array(m+1).fill(0));
+  const bt = Array.from({length:n+1}, ()=>Array(m+1).fill(null));
+  for(let i=1;i<=n;i++){ dp[i][0]=i; bt[i][0]='D'; }
+  for(let j=1;j<=m;j++){ dp[0][j]=j; bt[0][j]='I'; }
+  for(let i=1;i<=n;i++){
+    for(let j=1;j<=m;j++){
+      const cost = ref[i-1]===hyp[j-1]?0:1;
+      const choices = [
+        [dp[i-1][j-1]+cost, cost===0?'M':'S'],
+        [dp[i][j-1]+1, 'I'],
+        [dp[i-1][j]+1, 'D']
+      ];
+      let best = choices[0];
+      if(choices[1][0] < best[0]) best = choices[1];
+      if(choices[2][0] < best[0]) best = choices[2];
+      dp[i][j] = best[0];
+      bt[i][j] = best[1];
+    }
+  }
+  const ops=[];
+  let i=n,j=m;
+  while(i>0 || j>0){
+    const op = bt[i][j];
+    if(op==='M'){ ops.push(['M', ref[i-1], hyp[j-1]]); i--; j--; }
+    else if(op==='S'){ ops.push(['S', ref[i-1], hyp[j-1]]); i--; j--; }
+    else if(op==='I'){ ops.push(['I', '', hyp[j-1]]); j--; }
+    else if(op==='D'){ ops.push(['D', ref[i-1], '']); i--; }
+    else break;
+  }
+  ops.reverse();
+  return ops;
+}
+
+function diffChars(user, correct){
+  const ref = correct.toLowerCase().split('');
+  const hyp = user.toLowerCase().split('');
+  const ops = alignTokens(ref, hyp);
+  const disp = correct.split('');
+  let di = 0;
+  let out = '';
+  for(const [op, rt, ht] of ops){
+    const ch = disp[di] || rt || ht;
+    if(op==='M'){
+      out += `<span class="ok">${ch}</span>`; di++;
+    }else if(op==='S'){
+      out += `<span class="wrong">${ch}</span>`; di++;
+    }else if(op==='I'){
+      out += `<span class="wrong">_</span>`;
+    }else if(op==='D'){
+      out += `<span class="miss">_${rt}</span>`; di++;
+    }
+  }
+  return out;
+}
+
+function diffWords(user, correct){
+  const ref = normalizeSentence(correct).split(/\s+/);
+  const hyp = normalizeSentence(user).split(/\s+/);
+  const ops = alignTokens(ref, hyp);
+  const disp = correct.trim().split(/\s+/);
+  let di = 0;
+  const out = [];
+  const push = (cls, txt) => out.push(`<span class="${cls}">${txt}&nbsp;</span>`);
+  for(const [op, rt, ht] of ops){
+    const token = disp[di] || rt || ht;
+    if(op==='M'){
+      push('ok', token); di++;
+    }else if(op==='S'){
+      push('wrong', token); di++;
+    }else if(op==='I'){
+      push('wrong', '_');
+    }else if(op==='D'){
+      push('miss', '_' + rt); di++;
+    }
+  }
+  return out.join('');
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
   $('#btnStart').addEventListener('click', startTest);
-  $('#btnFinalize').addEventListener('click', finalizeTest);
 });
 
 async function startTest(){
   const res = await postJSON('/tests/start', {});
   session = res;
-  wrongIndices = new Set();
-  renderItems(session.items);
+  queue = [...session.items];
+  nextRound = [];
+  wrongCounts = {};
+  $('#startCard').classList.add('hidden');
+  const quiz = $('#quiz');
+  quiz.classList.remove('hidden');
+  document.body.classList.add('testing');
+  hudRemain = $('#remain');
+  hudTimer = $('#timer');
+  cardArea = $('#cardArea');
+  startTime = Date.now();
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 1000);
+  updateHUD();
+  showNext();
 }
 
-function renderItems(items){
-  const box = $('#items');
-  box.innerHTML = '';
-  items.forEach((it, idx)=>{
-    const card = document.createElement('div');
-    card.className = 'card';
-    if(it.type === 'vi2en_mcq'){
-      card.innerHTML = `
-        <div><b>[MCQ]</b> Dịch sang tiếng Anh: <i>${it.prompt_vi}</i></div>
-        <div id="opts-${idx}"></div>
-        <div id="fb-${idx}" class="small mono"></div>
-      `;
-      const opts = card.querySelector('#opts-'+idx);
-      it.options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.className = 'btn secondary'; btn.textContent = opt;
-        btn.addEventListener('click', ()=>{
-          const correct = (opt === it.answer);
-          $('#fb-'+idx).textContent = correct ? 'Đúng' : 'Sai';
-          if(!correct) wrongIndices.add(idx);
-          else wrongIndices.delete(idx);
-        });
-        opts.appendChild(btn);
-        opts.appendChild(document.createTextNode(' '));
-      });
-    }else if(it.type === 'type_from_meaning'){
-      card.innerHTML = `
-        <div><b>[Gõ từ]</b> Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>
-        <input type="text" id="in-${idx}"/>
-        <button class="btn secondary" id="chk-${idx}">Kiểm tra</button>
-        <div id="fb-${idx}" class="small mono"></div>
-      `;
-      card.querySelector('#chk-'+idx).addEventListener('click', ()=>{
-        const v = card.querySelector('#in-'+idx).value.trim();
-        const correct = (v.toLowerCase() === it.word.toLowerCase());
-        $('#fb-'+idx).textContent = correct ? 'Đúng' : 'Sai (đáp án: '+it.word+')';
-        if(!correct) wrongIndices.add(idx);
-        else wrongIndices.delete(idx);
-      });
+function showNext(){
+  cardArea.innerHTML = '';
+  if(queue.length === 0){
+    if(nextRound.length === 0){
+      finalize();
+      return;
     }else{
-      card.textContent = '(Bài tập khác sẽ được bổ sung)';
+      queue = nextRound;
+      nextRound = [];
+      const note = document.createElement('div');
+      note.textContent = `Làm lại các câu sai (${queue.length})`;
+      cardArea.appendChild(note);
+      updateHUD();
+      setTimeout(showNext, 1000);
+      return;
     }
-    box.appendChild(card);
-  });
+  }
+  currentItem = queue.shift();
+  renderItem(currentItem, cardArea);
+  updateHUD();
 }
 
-async function finalizeTest(){
-  if(!session){ alert('Chưa bắt đầu bài test'); return; }
-  if(phase === 'main' && wrongIndices.size > 0){
-    // Retake wrong-only
-    const items = session.items.filter((_,i)=> wrongIndices.has(i));
-    wrongIndices = new Set();
-    phase = 'retake';
-    alert('Làm lại các câu sai ('+items.length+')');
-    renderItems(items);
-    session.items = items; // update to current subset for final scoring simplicity
-    return;
+function renderItem(it, box){
+  const wrap = document.createElement('div');
+  wrap.className = 'card';
+  if(it.type === 'vi2en_mcq'){
+    wrap.innerHTML = `<div><b>[MCQ]</b> ${it.pos ? '('+it.pos+') ' : ''}Dịch sang tiếng Anh: <i>${it.prompt_vi}</i></div>`;
+    if(it.image_url){
+      const img = document.createElement('img');
+      img.src = it.image_url;
+      img.className = 'quiz-img';
+      wrap.appendChild(img);
+    }
+    const opts = document.createElement('div');
+    it.options.forEach(opt=>{
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = opt;
+      btn.addEventListener('click', ()=>{
+        const correct = wordEquals(opt, it.answer, it.pos);
+        showFeedback(correct, it.answer, opt);
+      });
+      opts.appendChild(btn);
+      opts.appendChild(document.createTextNode(' '));
+    });
+    wrap.appendChild(opts);
+    }else if(it.type === 'type_from_meaning'){
+      wrap.innerHTML = `<div><b>[Gõ từ]</b> ${it.pos ? '('+it.pos+') ' : ''}Viết đúng từ tiếng Anh cho nghĩa: <i>${it.prompt_vi}</i></div>`;
+      if(it.image_url){
+        const img = document.createElement('img');
+        img.src = it.image_url;
+        img.className = 'quiz-img';
+        wrap.appendChild(img);
+      }
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'ans';
+      wrap.appendChild(inp);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      btn.addEventListener('click', ()=>{
+        const v = inp.value.trim();
+        const correct = wordEquals(v, it.word, it.pos);
+        showFeedback(correct, it.word, v);
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
+      wrap.appendChild(btn);
+  }else if(it.type === 'vi_sentence_input'){
+      wrap.innerHTML = `<div><b>[Dịch câu]</b> ${it.pos ? '('+it.pos+') ' : ''}${it.prompt_vi}</div>`;
+      const inp = document.createElement('textarea');
+      inp.id = 'ans';
+      wrap.appendChild(inp);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      const check = ()=>{
+        const raw = inp.value;
+        const v = normalizeSentence(raw);
+        const ans = normalizeSentence(it.answer);
+        const correct = (v === ans);
+        showFeedback(correct, it.answer, raw);
+      };
+      btn.addEventListener('click', check);
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.ctrlKey) check(); });
+      wrap.appendChild(btn);
+    }else if(it.type === 'en_vi_match'){
+      wrap.innerHTML = `<div><b>[Nối từ]</b> Kéo nghĩa tiếng Việt vào đúng từ tiếng Anh</div>`;
+      const selects = {};
+      const rows = document.createElement('div');
+      it.en_words.forEach(en=>{
+        const row = document.createElement('div');
+        row.className = 'flex match-row';
+        const sp = document.createElement('div');
+        sp.className = 'enword';
+        sp.textContent = en + (it.pos_map && it.pos_map[en] ? ` (${it.pos_map[en]})` : '');
+        row.appendChild(sp);
+        const dz = document.createElement('div');
+        dz.className = 'dropzone';
+        dz.dataset.en = en;
+        dz.addEventListener('dragover', e=>e.preventDefault());
+        dz.addEventListener('drop', e=>{
+          e.preventDefault();
+          const id = e.dataTransfer.getData('text/plain');
+          const el = document.getElementById(id);
+          if(!el) return;
+          if(dz.firstChild) pool.appendChild(dz.firstChild);
+          dz.appendChild(el);
+          dz.dataset.vi = el.textContent;
+        });
+        row.appendChild(dz);
+        rows.appendChild(row);
+        selects[en] = dz;
+      });
+      wrap.appendChild(rows);
+      const pool = document.createElement('div');
+      pool.className = 'vi-pool';
+      pool.addEventListener('dragover', e=>e.preventDefault());
+      pool.addEventListener('drop', e=>{
+        e.preventDefault();
+        const id = e.dataTransfer.getData('text/plain');
+        const el = document.getElementById(id);
+        if(el) {
+          if(el.parentElement.classList.contains('dropzone')){
+            el.parentElement.dataset.vi = '';
+          }
+          pool.appendChild(el);
+        }
+      });
+      it.vi_meanings.forEach((v,idx)=>{
+        const d = document.createElement('div');
+        d.className = 'drag-item';
+        d.textContent = v;
+        d.draggable = true;
+        d.id = `vi_${idx}`;
+        d.addEventListener('dragstart', e=>{
+          e.dataTransfer.setData('text/plain', d.id);
+          if(d.parentElement.classList.contains('dropzone')){
+            d.parentElement.dataset.vi = '';
+          }
+        });
+        pool.appendChild(d);
+      });
+      wrap.appendChild(pool);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      btn.addEventListener('click', ()=>{
+        const colors = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#46f0f0','#f032e6','#bcf60c','#fabebe'];
+        let ok = true;
+        let i = 0;
+        for(const en of Object.keys(selects)){
+          const dz = selects[en];
+          const color = colors[i % colors.length];
+          const enSpan = dz.parentElement.querySelector('.enword');
+          enSpan.style.color = color;
+          if(dz.firstChild) dz.firstChild.style.color = color;
+          if(dz.dataset.vi !== it.pairs[en]){ ok = false; dz.classList.add('wrong'); }
+          else dz.classList.remove('wrong');
+          i++;
+        }
+        const ans = Object.entries(it.pairs).map(([e,v],idx)=>{
+          const c = colors[idx % colors.length];
+          return `<span style="color:${c}">${e}</span> - <span style="color:${c}">${v}</span>`;
+        }).join('<br>');
+        showFeedback(ok, ans);
+      });
+      wrap.appendChild(btn);
+    }else if(it.type === 'audio2en_input'){
+      wrap.innerHTML = `<div><b>[Nghe]</b> Viết lại từ tiếng Anh nghe được${it.pos ? ' ('+it.pos+')' : ''}</div>`;
+      const aud = document.createElement('audio');
+      aud.src = it.audio_url;
+      aud.controls = true;
+      wrap.appendChild(aud);
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'ans';
+      wrap.appendChild(inp);
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary';
+      btn.textContent = 'Kiểm tra';
+      btn.addEventListener('click', ()=>{
+        const v = inp.value.trim();
+        const correct = wordEquals(v, it.word, it.pos);
+        showFeedback(correct, it.word, v);
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter') btn.click(); });
+      wrap.appendChild(btn);
+    }else{
+      wrap.textContent = '(Bài tập khác sẽ được bổ sung)';
+    }
+  const fb = document.createElement('div');
+  fb.id = 'fb';
+  fb.className = 'small mono';
+  wrap.appendChild(fb);
+  box.appendChild(wrap);
+}
+
+function showFeedback(correct, answer, userInput=''){
+  const fb = $('#fb');
+  fb.innerHTML = '';
+  if(correct){
+    fb.innerHTML = '<span class="correct">Đúng</span>';
+  }else{
+    let ansHTML = answer;
+    if(currentItem.type === 'vi_sentence_input'){
+      ansHTML = diffWords(userInput, answer);
+    }else if(
+      currentItem.type === 'type_from_meaning' ||
+      currentItem.type === 'audio2en_input' ||
+      currentItem.type === 'vi2en_mcq'
+    ){
+      ansHTML = diffChars(userInput, answer);
+    }
+    fb.innerHTML = `<div class="wrong">Sai</div><div class="fb-ans">${ansHTML}</div>`;
+    wrongCounts[currentItem.word] = (wrongCounts[currentItem.word] || 0) + 1;
+    nextRound.push(currentItem);
   }
-  // compute labels
-  const labelSummary = {LTM:0, STM:0, REVIEW:0};
-  // naive: any item wrong -> word wrong
-  const wordWrong = new Map(); // word -> wrong count
-  (session.items || []).forEach((it, idx)=>{
-    // In this minimal demo we cannot track per-item correctness here;
-    // We'll approximate based on no remaining wrongIndices after retake -> all correct in retake
+  if(currentItem.audio_url && currentItem.type !== 'vi_sentence_input'){
+    audioPlayer = new Audio(currentItem.audio_url);
+    audioPlayer.play().catch(()=>{});
+  }
+  setTimeout(showNext, revealDelay(currentItem.type));
+}
+
+async function finalize(){
+  const results = {};
+  (session.picked_words || []).forEach(w=>{
+    results[w] = wrongCounts[w] || 0;
   });
-  // For demo: mark all as LTM after retake; in real app track per-question results
-  session.picked_words.forEach(w => labelSummary.LTM++);
-  const res = await postJSON('/tests/finalize', { session_id: session.session_id, label_summary: labelSummary });
-  alert('Đã cập nhật nhãn ghi nhớ. Tóm tắt: ' + JSON.stringify(labelSummary));
+  const res = await postJSON('/tests/finalize', { session_id: session.session_id, results });
+  alert('Hoàn tất. Nhãn: ' + JSON.stringify(res.label_summary) + `\nThời gian: ${res.duration_sec}s\nLặp lại: ${res.retakes}`);
+  document.body.classList.remove('testing');
+  $('#startCard').classList.remove('hidden');
+  const quiz = $('#quiz');
+  quiz.classList.add('hidden');
+  clearInterval(timerInterval);
+  if(cardArea) cardArea.innerHTML = '';
+  if(hudRemain) hudRemain.textContent = '0';
+  if(hudTimer) hudTimer.textContent = '0:00';
+}
+
+function updateHUD(){
+  if(!hudRemain) return;
+  const remaining = queue.length + nextRound.length + (currentItem ? 1 : 0);
+  hudRemain.textContent = remaining;
+}
+
+function updateTimer(){
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const left = Math.max(0, maxSec - elapsed);
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  if(hudTimer){
+    hudTimer.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  }
+  if(left <= 0){
+    clearInterval(timerInterval);
+    finalize();
+  }
 }

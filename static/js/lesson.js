@@ -4,8 +4,8 @@ let session = null;
 let timerId = null;
 
 window.addEventListener('DOMContentLoaded', async ()=>{
-  const audio = document.querySelector('audio');
-  bindHotkeys(audio);
+  const media = document.querySelector('#media');
+  bindHotkeys(media);
 
   // start 30' session from server
   session = await postJSON(location.pathname.replace('/lesson/', '/lesson/') + '/start', {});
@@ -15,20 +15,20 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   $('#btnSaveWord').addEventListener('click', onSaveWord);
 });
 
-function bindHotkeys(audio){
+function bindHotkeys(media){
   document.addEventListener('keydown', (e)=>{
     if(e.key === '='){
       e.preventDefault();
-      if(audio.paused){
-        audio.play(); // nếu đang dừng -> phát
+      if(media.paused){
+        media.play(); // nếu đang dừng -> phát
       }else{
-        audio.pause(); // nếu đang phát -> pause + lùi 3s
-        audio.currentTime = Math.max(0, audio.currentTime - 3);
+        media.pause(); // nếu đang phát -> pause + lùi 3s
+        media.currentTime = Math.max(0, media.currentTime - 3);
       }
     }
     if(e.key === '-'){
       e.preventDefault();
-      audio.currentTime = Math.max(0, audio.currentTime - 10);
+      media.currentTime = Math.max(0, media.currentTime - 10);
     }
   });
 }
@@ -87,6 +87,9 @@ function renderResult(res){
     const el = document.createElement('span');
     el.className = 'hl ' + s.status;
     el.textContent = s.token;
+    if(s.correct !== undefined){
+      el.title = s.correct || '(thừa)';
+    }
     spans.appendChild(el);
     spans.appendChild(document.createTextNode(' '));
   });
@@ -119,7 +122,6 @@ async function onSaveWord(){
   const start = ta.selectionStart, end = ta.selectionEnd;
   const selected = ta.value.slice(start, end).trim();
   if(!selected){ alert('Hãy bôi đen một từ trong vùng nhập.'); return; }
-  const word = selected.split(/\s+/)[0];
-  const res = await postJSON('/vocab/save_selection', { word });
+  const res = await postJSON('/vocab/save_selection', { text: selected });
   alert(res.message || 'Đã lưu từ');
 }

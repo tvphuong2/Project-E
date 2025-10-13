@@ -1,8 +1,8 @@
 # routes\dictation.py
-import os, uuid, re, json
+import os, uuid, json
 from flask import Blueprint, current_app, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
-from services.alignment import tokenize_words, align_and_score, collapse_deletions_to_single_underscore
+from services.alignment import tokenize_words, align_and_score
 from services.text_normalizer import normalize_for_scoring
 from services.stats_service import SpeedCalculator, ProgressTracker
 from utils.timeutil import _utcnow, _iso
@@ -36,26 +36,31 @@ def create_lesson():
       - Redirect sang trang lesson/<id>
     """
     title = request.form.get("title", "Untitled").strip() or "Untitled"
-    audio = request.files.get("audio")
+    media = request.files.get("media")
     text = request.form.get("text", "")
-    if not (audio and text):
-        return "Missing audio or text", 400
+    if not (media and text):
+        return "Missing media or text", 400
 
     lid = str(uuid.uuid4())
     ldir = os.path.join(current_app.config["LESSON_DIR"], lid)
     os.makedirs(ldir, exist_ok=True)
 
-    safe_name = secure_filename(audio.filename) or f"audio_{lid}.mp3"
-    audio_path_fs = os.path.join(ldir, safe_name)
-    audio.save(audio_path_fs)
+    safe_name = secure_filename(media.filename) or f"media_{lid}"
+    media_path_fs = os.path.join(ldir, safe_name)
+    media.save(media_path_fs)
 
     llm = current_app.config["LLM_CLIENT"]
-    ref_norm = llm.normalize_text(text) if current_app.config["OPENAI_KEY"] else normalize_for_scoring(text)
+    if current_app.config["OPENAI_KEY"]:
+        ref_norm = normalize_for_scoring(llm.normalize_text(text))
+    else:
+        ref_norm = normalize_for_scoring(text)
 
+    rel_path = os.path.relpath(media_path_fs, current_app.config["BASE_DIR"]).replace("\\", "/")
+    field = "video_path" if media.mimetype.startswith("video") else "audio_path"
     obj = {
         "id": lid,
         "title": title,
-        "audio_path": os.path.relpath(audio_path_fs, current_app.config["BASE_DIR"]).replace("\\", "/"),
+        field: rel_path,
         "text_original": text,
         "text_normalized": ref_norm,
         "n_ref_words": len(tokenize_words(ref_norm)),
@@ -103,7 +108,7 @@ def lesson_start(id: str):
 def lesson_check(id: str):
     """
     Trong session đang chạy: tính WER và highlight tại chỗ (không lưu attempt).
-    Dùng LLM để chuẩn hoá HYP nếu có key; nếu không thì rule-based.
+    Chuẩn hoá văn bản theo luật (không dùng LLM) trước khi so sánh.
     """
     body = request.get_json(force=True)
     user_text = body.get("user_text", "")
@@ -123,26 +128,24 @@ def lesson_check(id: str):
     with open(meta, "r", encoding="utf-8") as f:
         obj = json.load(f)
 
-    llm = current_app.config["LLM_CLIENT"]
-    hyp = llm.normalize_text(user_text) if current_app.config["OPENAI_KEY"] else normalize_for_scoring(user_text)
-    ref = obj["text_normalized"]
+    ref = normalize_for_scoring(obj.get("text_normalized") or obj.get("text_original", ""))
+    hyp = normalize_for_scoring(user_text)
 
     ref_toks = tokenize_words(ref)
     hyp_toks = tokenize_words(hyp)
 
     ar = align_and_score(ref_toks, hyp_toks)
-    ops = collapse_deletions_to_single_underscore(ar.ops)
 
     spans = []
-    for op, rt, ht in ops:
-        if op == "_":
-            spans.append({"token": "_", "status": "missing"})
-        elif op == "M":
-            spans.append({"token": ht, "status": "correct"})
-        elif op in ("S", "I"):
-            spans.append({"token": ht if ht else rt, "status": "wrong"})
+    for op, rt, ht in ar.ops:
+        if op == "M":
+            spans.append({"token": ht, "status": "correct", "correct": ht})
+        elif op == "S":
+            spans.append({"token": ht, "status": "wrong", "correct": rt})
+        elif op == "I":
+            spans.append({"token": ht, "status": "wrong", "correct": ""})
         elif op == "D":
-            spans.append({"token": "_", "status": "missing"})
+            spans.append({"token": "_", "status": "missing", "correct": rt})
 
     correct = sum(1 for op, _, _ in ar.ops if op == "M")
     wrong = sum(1 for op, _, _ in ar.ops if op in ("S", "I"))
@@ -162,7 +165,8 @@ def lesson_check(id: str):
 @bp.post("/lesson/<id>/finalize")
 def lesson_finalize(id: str):
     """
-    Kết thúc session: lưu attempt vào lesson.json và trả lại đáp án (ref normalized).
+    Kết thúc session: lưu attempt vào lesson.json và trả lại đáp án đã chuẩn hoá.
+    Việc chuẩn hoá chỉ dùng luật, không gọi LLM.
     """
     body = request.get_json(force=True)
     user_text = body.get("user_text", "")
@@ -178,9 +182,8 @@ def lesson_finalize(id: str):
     with open(meta, "r", encoding="utf-8") as f:
         obj = json.load(f)
 
-    llm = current_app.config["LLM_CLIENT"]
-    ref = obj["text_normalized"]
-    hyp = llm.normalize_text(user_text) if current_app.config["OPENAI_KEY"] else normalize_for_scoring(user_text)
+    ref = normalize_for_scoring(obj.get("text_normalized") or obj.get("text_original", ""))
+    hyp = normalize_for_scoring(user_text)
 
     ref_toks = tokenize_words(ref)
     hyp_toks = tokenize_words(hyp)
